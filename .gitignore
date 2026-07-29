@@ -1,12 +1,12 @@
+# ── Python ───────────────────────────────────────────────────────────────────
 .venv/
 __pycache__/
 *.pyc
+
+# ── Environment / secrets ────────────────────────────────────────────────────
 .env
 .env.*
-node_modules/
-.next/
-out/
-.DS_Store
+!.env.example
 *.pem
 *_key
 *_key.pub
@@ -16,8 +16,23 @@ id_rsa*
 quansec_ca
 quansec_ca.pub
 known_hosts
+
+# ── Node / Next.js ───────────────────────────────────────────────────────────
+node_modules/
+.next/
+out/
+
+# ── Archives, dumps, logs ────────────────────────────────────────────────────
 *.tar.gz
 *.zip
 *.log
-*.sql
 *.dump
+
+# ── SQL ──────────────────────────────────────────────────────────────────────
+# Ignore ad-hoc dumps and scratch SQL, but the schema migrations are source
+# code — the documented setup depends on them being in the repository.
+*.sql
+!quansec/migrations/*.sql
+
+# ── OS ───────────────────────────────────────────────────────────────────────
+.DS_Store

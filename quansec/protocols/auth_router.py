@@ -89,7 +89,10 @@ async def login_scoped(
     )
     if not row or not verify_password(form.password, row["password_hash"]):
         raise HTTPException(status_code=401, detail="Incorrect email or password")
-    if row["portal"] != portal:
+    # Admins can access any portal; 'main' is the superuser portal (no restriction)
+    is_admin = row["role"] == "admin"
+    portal_ok = is_admin or row["portal"] == "main" or row["portal"] == portal
+    if not portal_ok:
         raise HTTPException(status_code=403, detail=f"This account is not registered for the {portal} portal")
     token = create_access_token(row["id"], row["email"], row["role"])
     await conn.execute(

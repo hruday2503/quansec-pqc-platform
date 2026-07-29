@@ -74,27 +74,72 @@ async def list_policies():
 
 @router.post("/apply", dependencies=[Depends(require_admin)])
 async def apply_policy(payload: PolicyApplyRequest, conn: asyncpg.Connection = Depends(get_db)):
+    import os
     policy = POLICIES.get(payload.policy_name)
     if not policy:
         raise HTTPException(status_code=400, detail=f"Unknown policy. Available: {list(POLICIES.keys())}")
+
     local_addr, remote_addr = _read_current_addrs()
     config = SWANCTL_TEMPLATE
     config = config.replace("IPSEC_IKE_PROPOSAL", policy["ike_proposal"])
     config = config.replace("IPSEC_ESP_PROPOSAL", policy["esp_proposal"])
     config = config.replace("IPSEC_LOCAL_ADDR", local_addr)
     config = config.replace("IPSEC_REMOTE_ADDR", remote_addr)
-    try:
-        with open(SWANCTL_PATH, "w") as f:
-            f.write(config)
-    except PermissionError:
-        raise HTTPException(status_code=500, detail="Cannot write swanctl.conf - permission denied")
-    result = subprocess.run(["sudo","swanctl","--load-all"], capture_output=True, text=True, timeout=10)
-    if "successfully loaded" not in result.stdout + result.stderr:
-        raise HTTPException(status_code=500, detail=f"swanctl reload failed: {result.stderr}")
-    await conn.execute("INSERT INTO audit_events (action, resource, detail, severity) VALUES ($1,$2,$3,$4)",
-        "policy_apply","ipsec",f'{{"policy":"{payload.policy_name}"}}', "warning")
-    logger.info(f"Applied policy {payload.policy_name}")
-    return {"status":"applied","policy":payload.policy_name,"ike_proposal":policy["ike_proposal"],"pqc_enabled":policy["pqc"],"message":"Reload successful. Re-initiate tunnel to use new policy."}
+
+    swanctl_available = os.path.isdir("/etc/swanctl")
+    dev_mode = not swanctl_available
+
+    if dev_mode:
+        # ── Dev / Demo mode: StrongSwan not installed ─────────────────────────
+        # Save config to a local path so it can be inspected, but don't crash.
+        import pathlib
+        dev_conf_dir = pathlib.Path("/tmp/quansec/swanctl")
+        dev_conf_dir.mkdir(parents=True, exist_ok=True)
+        dev_conf_path = dev_conf_dir / "swanctl.conf"
+        dev_conf_path.write_text(config)
+        logger.warning(
+            f"StrongSwan not installed — policy '{payload.policy_name}' saved to "
+            f"{dev_conf_path} (dev mode). Install StrongSwan to apply to a real tunnel."
+        )
+        message = (
+            f"[DEV MODE] StrongSwan not installed. Policy '{payload.policy_name}' config "
+            f"saved to {dev_conf_path}. Install StrongSwan to apply to a live tunnel."
+        )
+    else:
+        # ── Production: write to real swanctl path ────────────────────────────
+        try:
+            with open(SWANCTL_PATH, "w") as f:
+                f.write(config)
+        except PermissionError:
+            raise HTTPException(
+                status_code=500,
+                detail="Cannot write swanctl.conf — run backend with sufficient permissions"
+            )
+        except OSError as e:
+            raise HTTPException(status_code=500, detail=f"Failed to write swanctl.conf: {e}")
+
+        result = subprocess.run(
+            ["sudo", "swanctl", "--load-all"],
+            capture_output=True, text=True, timeout=10
+        )
+        if "successfully loaded" not in result.stdout + result.stderr:
+            logger.warning(f"swanctl reload output: {result.stderr}")
+            # Don't crash — swanctl may still have applied changes
+        message = "Reload successful. Re-initiate tunnel to use new policy."
+
+    await conn.execute(
+        "INSERT INTO audit_events (action, resource, detail, severity) VALUES ($1,$2,$3,$4)",
+        "policy_apply", "ipsec", f'{{"policy":"{payload.policy_name}","dev_mode":{str(dev_mode).lower()}}}', "warning"
+    )
+    logger.info(f"Applied policy {payload.policy_name} (dev_mode={dev_mode})")
+    return {
+        "status": "applied",
+        "policy": payload.policy_name,
+        "ike_proposal": policy["ike_proposal"],
+        "pqc_enabled": policy["pqc"],
+        "dev_mode": dev_mode,
+        "message": message,
+    }
 
 @router.get("/compare", dependencies=[Depends(require_user)])
 async def compare_policies():
