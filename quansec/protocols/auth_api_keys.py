@@ -37,7 +37,7 @@ from pydantic import BaseModel, Field
 from core import audit
 from core.auth import require_user
 from core.database import get_db
-from core.scopes import ALL_SCOPES, describe, expand, scopes_for
+from core.scopes import ALL_SCOPES, SYSTEM_ADMIN, describe, expand, scopes_for
 
 router = APIRouter(prefix="/api/keys", tags=["API Keys"])
 
@@ -60,6 +60,12 @@ def hash_key(raw_key: str) -> str:
     return hashlib.sha256(raw_key.encode()).hexdigest()
 
 
+# Keys expire by default. An integration that outlives its expiry is a
+# rotation prompt; one that never expires is a credential nobody remembers
+# issuing. 90 days is short enough to force rotation into normal operations.
+DEFAULT_EXPIRY_DAYS = 90
+
+
 class ApiKeyCreate(BaseModel):
     name: str = Field(min_length=1, max_length=100)
     scopes: List[str] = Field(
@@ -74,7 +80,14 @@ class ApiKeyCreate(BaseModel):
     )
     expires_in_days: Optional[int] = Field(
         default=None, ge=1, le=3650,
-        description="Optional expiry. Omit for a key that does not expire.",
+        description="Days until the key expires. Omitted means the "
+                    f"{DEFAULT_EXPIRY_DAYS}-day default.",
+    )
+    never_expires: bool = Field(
+        default=False,
+        description="Issue a key with no expiry. Restricted to system:admin — "
+                    "a non-expiring credential is a permanent liability and "
+                    "must be a deliberate, privileged act.",
     )
 
 
@@ -164,10 +177,23 @@ async def create_api_key(
                    "requested permissions.",
         )
 
-    expires_at = (
-        datetime.now(timezone.utc) + timedelta(days=payload.expires_in_days)
-        if payload.expires_in_days else None
-    )
+    # Expiry: default 90 days, and a non-expiring key is privileged.
+    #
+    # Omitting expires_in_days does NOT mean "forever" — that was the previous
+    # behaviour and it made the most dangerous option the easiest to reach.
+    # Forever now requires never_expires AND system:admin.
+    if payload.never_expires:
+        if SYSTEM_ADMIN not in own_scopes:
+            raise HTTPException(
+                status_code=403,
+                detail="A non-expiring API key requires system:admin. Issue a "
+                       f"key with an expiry, or ask an administrator. Default "
+                       f"is {DEFAULT_EXPIRY_DAYS} days.",
+            )
+        expires_at = None
+    else:
+        days = payload.expires_in_days or DEFAULT_EXPIRY_DAYS
+        expires_at = datetime.now(timezone.utc) + timedelta(days=days)
 
     full_key, masked, key_hash = _generate_key()
     row = await conn.fetchrow(

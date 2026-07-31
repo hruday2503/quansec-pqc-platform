@@ -21,6 +21,11 @@ from typing import Dict, FrozenSet, Iterable, List, Sequence
 # ── The vocabulary ───────────────────────────────────────────────────────────
 
 TLS_READ = "tls:read"
+# Run enforcement probes and validation tests. Deliberately BETWEEN read and
+# admin: a probe spawns an OpenSSL client and writes evidence rows, which is
+# more than reading, but it cannot change the running policy. A monitoring
+# integration needs exactly this and must not be handed tls:admin to get it.
+TLS_PROBE = "tls:probe"
 TLS_ADMIN = "tls:admin"
 SSH_READ = "ssh:read"
 SSH_ADMIN = "ssh:admin"
@@ -29,7 +34,7 @@ IPSEC_ADMIN = "ipsec:admin"
 SYSTEM_ADMIN = "system:admin"
 
 ALL_SCOPES: FrozenSet[str] = frozenset({
-    TLS_READ, TLS_ADMIN,
+    TLS_READ, TLS_PROBE, TLS_ADMIN,
     SSH_READ, SSH_ADMIN,
     IPSEC_READ, IPSEC_ADMIN,
     SYSTEM_ADMIN,
@@ -41,13 +46,19 @@ ALL_SCOPES: FrozenSet[str] = frozenset({
 # forgotten.
 IMPLIES: Dict[str, FrozenSet[str]] = {
     SYSTEM_ADMIN: ALL_SCOPES,
-    TLS_ADMIN: frozenset({TLS_READ}),
+    # tls:admin implies probe as well as read — an administrator who can
+    # replace the policy can certainly run a probe against it.
+    TLS_ADMIN: frozenset({TLS_READ, TLS_PROBE}),
+    # A prober can read what it produces. It cannot apply policy: tls:probe
+    # deliberately does NOT imply tls:admin in either direction.
+    TLS_PROBE: frozenset({TLS_READ}),
     SSH_ADMIN: frozenset({SSH_READ}),
     IPSEC_ADMIN: frozenset({IPSEC_READ}),
 }
 
 # Convenience sets for router dependencies.
-TLS_READ_SCOPES = (TLS_READ, TLS_ADMIN, SYSTEM_ADMIN)
+TLS_READ_SCOPES = (TLS_READ, TLS_PROBE, TLS_ADMIN, SYSTEM_ADMIN)
+TLS_PROBE_SCOPES = (TLS_PROBE, TLS_ADMIN, SYSTEM_ADMIN)
 TLS_ADMIN_SCOPES = (TLS_ADMIN, SYSTEM_ADMIN)
 
 # ── Role and portal mapping ──────────────────────────────────────────────────
