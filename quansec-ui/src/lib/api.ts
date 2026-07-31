@@ -229,6 +229,19 @@ export interface TlsSession {
   log_offset: number | null;
   recorded_at: string | null;
   raw_line?: string | null;
+
+  /** Namespaced `<listener_port>:<$connection>`. Null on pre-010 rows. */
+  connection_id: string | null;
+  /** Null means NGINX reported no group — not the same as classical. */
+  hybrid_negotiated: boolean | null;
+  mtls_enabled: boolean;
+  /** Null when no client certificate was requested: no check, not a failed one. */
+  client_certificate_verified: boolean | null;
+  certificate_signature_algorithm: string | null;
+  started_at: string | null;
+  last_seen: string | null;
+  request_count: number;
+  evidence_source: string | null;
 }
 
 export interface TlsEvent {

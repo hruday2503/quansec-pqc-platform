@@ -200,6 +200,23 @@ class TlsSessionResponse(BaseModel):
     log_offset: Optional[int] = None
     recorded_at: Optional[datetime] = None
 
+    # ── Added in 010 ─────────────────────────────────────────────────────────
+    # Namespaced "<listener_port>:<$connection>". Null on rows collected before
+    # the log format carried $connection.
+    connection_id: Optional[str] = None
+    # Tri-state on purpose: null means NGINX reported no group, which is not
+    # the same as False. A resumed session performs no key exchange.
+    hybrid_negotiated: Optional[bool] = None
+    mtls_enabled: bool = False
+    # Null when no client certificate was requested — an absence of a check,
+    # not a failed one.
+    client_certificate_verified: Optional[bool] = None
+    certificate_signature_algorithm: Optional[str] = None
+    started_at: Optional[datetime] = None
+    last_seen: Optional[datetime] = None
+    request_count: int = 1
+    evidence_source: Optional[str] = None
+
 
 class TlsSessionDetailResponse(TlsSessionResponse):
     """A single session, including the raw log line it was parsed from."""

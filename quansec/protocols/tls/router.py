@@ -362,7 +362,10 @@ async def tls_sessions(
                    negotiated_group, client_groups, client_verify, client_s_dn,
                    server_name, session_reused, http_status, request_time,
                    bytes_sent, request_line, pqc_enabled, kem_label,
-                   log_source, log_offset, recorded_at
+                   log_source, log_offset, recorded_at,
+                   connection_id, hybrid_negotiated, mtls_enabled,
+                   client_certificate_verified, certificate_signature_algorithm,
+                   started_at, last_seen, request_count, evidence_source
             FROM tls_sessions {where}
             ORDER BY occurred_at DESC, id DESC
             LIMIT ${len(params)}""",
