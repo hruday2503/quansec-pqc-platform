@@ -160,25 +160,34 @@ export interface TlsStatus {
  * TlsStatus.hybrid_only_enforced is true.
  */
 export interface TlsStats {
-  total_observations: number;
-  /** Logged with HTTP status < 400. */
-  successful: number;
-  /** Logged with HTTP status >= 400. */
-  failed: number;
-  /** No HTTP status in the log line. Not a failure — the log records none. */
-  unrecorded: number;
-  /** Resumed sessions, which perform no key exchange and carry no group. */
-  sessions_reused: number;
-  pqc_observations: number;
-  pqc_coverage: number;
+  /** One CONNECTION, not one request. Keep-alive requests share a session. */
+  total_sessions: number;
   /**
-   * Percentiles over NGINX `$request_time`, which spans the whole request —
-   * handshake plus HTTP exchange. Null until a session has been observed.
+   * Seen within `active_window_seconds`. NGINX logs no connection-close event,
+   * so liveness can only ever be inferred from recency.
    */
-  request_time_ms_p50: number | null;
-  request_time_ms_p95: number | null;
-  /** Non-zero buckets only: success | client_error | server_error | unrecorded. */
-  outcomes: Record<string, number>;
+  active_sessions: number;
+  hybrid_sessions: number;
+  classical_sessions: number;
+  /** No group recorded. A resumed session performs no key exchange — not classical. */
+  unknown_sessions: number;
+  /**
+   * Percentage of sessions WITH a recorded group that were hybrid. Unknown-group
+   * sessions are excluded from the denominator, not counted as classical.
+   */
+  hybrid_coverage: number;
+  tls13_coverage: number;
+  /**
+   * Probes that expected to connect and did not. A refused handshake writes no
+   * access-log line, so this is not countable from the log; an HTTP 5xx is a
+   * failed request on a SUCCESSFUL handshake and is excluded.
+   */
+  failed_handshakes: number;
+  active_alerts: number;
+  last_observed_at: string | null;
+  /** False when nothing has ever been recorded — a measured zero vs an empty table. */
+  has_evidence: boolean;
+  active_window_seconds: number;
 }
 
 export interface TlsReadinessCheck {

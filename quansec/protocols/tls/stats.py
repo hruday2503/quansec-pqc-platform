@@ -1,73 +1,131 @@
 """
 protocols/tls/stats.py — aggregates over observed TLS sessions.
 
-Every number here is a count or a percentile over rows in `tls_sessions`, and
-every row in that table came from a line NGINX wrote. Nothing is derived from
-configuration, and an empty table yields zeros rather than a placeholder.
+Every number is a count, a percentage of counts, or a timestamp taken from
+rows the collector wrote from real NGINX log lines. Nothing is derived from
+configuration, and an empty table yields zeros and nulls rather than anything
+that reads as a measurement.
 
-Two naming points, because the field names are load-bearing:
+Three definitions that are easy to get wrong, so they are pinned here:
 
-  request_time_ms_*   percentiles over NGINX `$request_time`, which spans the
-                      whole request — handshake plus HTTP exchange. It is NOT a
-                      handshake timing, and is not named as if it were.
+  session           One CONNECTION, not one request. NGINX logs a line per
+                    request, and a keep-alive connection produces several
+                    sharing one $connection id. Counting lines would inflate
+                    every total. Rows written before 010 have no connection_id
+                    and are counted individually, which is the truthful
+                    reading: their connection identity was never recorded.
 
-  pqc_coverage        the share of observed sessions whose recorded
-                      `negotiated_group` was hybrid, per collector.classify_group.
-                      It says the group was observed, never that it was enforced.
+  failed_handshakes NOT countable from the access log. A refused handshake
+                    never reaches the HTTP layer, so NGINX writes no line for
+                    it — the absence is the whole point of fail-closed. The
+                    only evidence of a failed handshake is a probe that
+                    expected to connect and did not, so that is what this
+                    counts. An HTTP 5xx is a failed REQUEST on a successful
+                    handshake and is deliberately not included.
+
+  hybrid_coverage   Share of sessions WITH A RECORDED GROUP that were hybrid.
+                    Sessions whose group NGINX did not report (resumed
+                    sessions perform no key exchange) are excluded from the
+                    denominator rather than counted as classical, which would
+                    understate coverage by treating "unknown" as "no".
 """
 
-from typing import Any, Dict
+from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, Optional
 
 import asyncpg
 
+# A session counts as active if a request on it was logged within this window.
+# NGINX has no "connection closed" event in the access log, so liveness can
+# only ever be inferred from recency — named here so the UI can say so.
+ACTIVE_WINDOW_SECONDS = 300
+
+# Telemetry older than this means the collector or the data plane has stopped.
+TELEMETRY_FRESH_SECONDS = 120
+
 
 async def get_tls_stats(conn: asyncpg.Connection) -> Dict[str, Any]:
-    """Counts and percentiles over every session the collector has recorded."""
+    """Counts and coverage over every session the collector has recorded."""
+    cutoff = datetime.now(timezone.utc) - timedelta(seconds=ACTIVE_WINDOW_SECONDS)
+
+    # One pass, aggregated per connection. COALESCE gives pre-010 rows their
+    # own identity instead of collapsing them all into a single NULL group.
     row = await conn.fetchrow(
         """
+        WITH sessions AS (
+            SELECT COALESCE(connection_id, 'row:' || id::text) AS sid,
+                   bool_or(hybrid_negotiated IS TRUE)          AS is_hybrid,
+                   bool_or(negotiated_group IS NOT NULL
+                           AND negotiated_group <> '')         AS has_group,
+                   bool_or(tls_protocol = 'TLSv1.3')           AS is_tls13,
+                   max(COALESCE(last_seen, occurred_at))       AS seen_at
+              FROM tls_sessions
+             GROUP BY 1
+        )
         SELECT
-            COUNT(*)                                            AS total_observations,
-            COUNT(*) FILTER (WHERE http_status <  400)          AS successful,
-            COUNT(*) FILTER (WHERE http_status >= 400)          AS failed,
-            COUNT(*) FILTER (WHERE http_status IS NULL)         AS unrecorded,
-            COUNT(*) FILTER (WHERE http_status >= 400
-                               AND http_status <  500)          AS client_error,
-            COUNT(*) FILTER (WHERE http_status >= 500)          AS server_error,
-            COUNT(*) FILTER (WHERE pqc_enabled)                 AS pqc_observations,
-            COUNT(*) FILTER (WHERE session_reused)              AS sessions_reused,
-            percentile_cont(0.5)  WITHIN GROUP (ORDER BY request_time) AS p50,
-            percentile_cont(0.95) WITHIN GROUP (ORDER BY request_time) AS p95
-        FROM tls_sessions
-        """
+            count(*)                                          AS total_sessions,
+            count(*) FILTER (WHERE seen_at >= $1)              AS active_sessions,
+            count(*) FILTER (WHERE is_hybrid)                  AS hybrid_sessions,
+            count(*) FILTER (WHERE has_group AND NOT is_hybrid) AS classical_sessions,
+            count(*) FILTER (WHERE NOT has_group)              AS unknown_sessions,
+            count(*) FILTER (WHERE is_tls13)                   AS tls13_sessions,
+            max(seen_at)                                       AS last_observed_at
+        FROM sessions
+        """,
+        cutoff,
     )
 
-    total = row["total_observations"] or 0
-    pqc = row["pqc_observations"] or 0
+    total = row["total_sessions"] or 0
+    hybrid = row["hybrid_sessions"] or 0
+    classical = row["classical_sessions"] or 0
+    unknown = row["unknown_sessions"] or 0
+    tls13 = row["tls13_sessions"] or 0
 
-    # Only non-zero buckets are returned: a bucket of 0 is noise in the UI, and
-    # the totals above already say how many observations exist.
-    outcomes = {
-        name: count
-        for name, count in (
-            ("success", row["successful"] or 0),
-            ("client_error", row["client_error"] or 0),
-            ("server_error", row["server_error"] or 0),
-            ("unrecorded", row["unrecorded"] or 0),
-        )
-        if count
-    }
+    # Denominator excludes sessions with no recorded group. See module docstring.
+    with_group = hybrid + classical
+
+    # A handshake that was expected to succeed and did not. Probe evidence is
+    # the only place this is observable.
+    failed_handshakes = await conn.fetchval(
+        """SELECT count(*) FROM tls_probe_results
+            WHERE expected_outcome = 'connect' AND actual_outcome <> 'connect'"""
+    ) or 0
+
+    active_alerts = await conn.fetchval(
+        "SELECT count(*) FROM tls_alerts WHERE acknowledged = FALSE"
+    ) or 0
+
+    last_observed: Optional[datetime] = row["last_observed_at"]
 
     return {
-        "total_observations": total,
-        "successful": row["successful"] or 0,
-        "failed": row["failed"] or 0,
-        # Logged without an HTTP status. Counted separately rather than folded
-        # into `failed`, which would assert a failure the log does not record.
-        "unrecorded": row["unrecorded"] or 0,
-        "sessions_reused": row["sessions_reused"] or 0,
-        "pqc_observations": pqc,
-        "pqc_coverage": round(pqc / total * 100, 1) if total else 0.0,
-        "request_time_ms_p50": round(row["p50"] * 1000, 2) if row["p50"] is not None else None,
-        "request_time_ms_p95": round(row["p95"] * 1000, 2) if row["p95"] is not None else None,
-        "outcomes": outcomes,
+        "total_sessions": total,
+        "active_sessions": row["active_sessions"] or 0,
+        "hybrid_sessions": hybrid,
+        "classical_sessions": classical,
+        "unknown_sessions": unknown,
+        "hybrid_coverage": round(hybrid / with_group * 100, 1) if with_group else 0.0,
+        "tls13_coverage": round(tls13 / total * 100, 1) if total else 0.0,
+        "failed_handshakes": failed_handshakes,
+        "active_alerts": active_alerts,
+        "last_observed_at": last_observed,
+        # Stated rather than left implicit: a reader seeing hybrid_coverage of
+        # 0.0 needs to know whether that is a measurement or an empty table.
+        "has_evidence": total > 0,
+        "active_window_seconds": ACTIVE_WINDOW_SECONDS,
     }
+
+
+async def telemetry_is_fresh(conn: asyncpg.Connection) -> bool:
+    """
+    Whether the collector has seen anything recently enough to be trusted.
+
+    Stale telemetry is not the same as no traffic, and neither is the same as a
+    healthy quiet system — this only reports the timestamp fact, and the caller
+    decides what to claim from it.
+    """
+    last = await conn.fetchval(
+        "SELECT max(COALESCE(last_seen, occurred_at)) FROM tls_sessions"
+    )
+    if last is None:
+        return False
+    return (datetime.now(timezone.utc) - last).total_seconds() <= TELEMETRY_FRESH_SECONDS

@@ -212,8 +212,35 @@ class Settings:
     TLS_MTLS: bool = _flag("QUANSEC_TLS_MTLS", "false")
     TLS_EARLY_DATA: bool = _flag("QUANSEC_TLS_EARLY_DATA", "false")
 
-    # What NGINX proxies. The ONLY thing exposed through the PQ endpoint.
+    # The FastAPI upstream NGINX proxies to.
     TLS_UPSTREAM: str = os.getenv("QUANSEC_TLS_UPSTREAM", "127.0.0.1:8000")
+
+    # ── Portal listener ──────────────────────────────────────────────────────
+    # A SECOND listener, serving the dashboard to a browser.
+    #
+    # It exists because the strict-hybrid listener on TLS_PORT cannot serve a
+    # browser: no mainstream browser negotiates X25519MLKEM768 against a
+    # ciphersuite list of exactly TLS_AES_256_GCM_SHA384. Rather than weaken
+    # the enforcement listener to make the UI reachable — which would destroy
+    # the property the probes exist to verify — the portal gets its own
+    # listener with browser-compatible groups.
+    #
+    # Both listeners are logged, to SEPARATE files, so a session observed on
+    # the portal is never counted as evidence of hybrid enforcement.
+    TLS_PORTAL_ENABLED: bool = _flag("QUANSEC_TLS_PORTAL_ENABLED", "true")
+    TLS_PORTAL_PORT: int = int(os.getenv("QUANSEC_TLS_PORTAL_PORT", "8444"))
+    TLS_PORTAL_GROUPS: str = os.getenv(
+        "QUANSEC_TLS_PORTAL_GROUPS", "X25519MLKEM768:x25519:secp256r1"
+    )
+    TLS_PORTAL_CIPHERSUITES: str = os.getenv(
+        "QUANSEC_TLS_PORTAL_CIPHERSUITES",
+        "TLS_AES_256_GCM_SHA384:TLS_AES_128_GCM_SHA256:TLS_CHACHA20_POLY1305_SHA256",
+    )
+    # Where Next.js is listening, for the portal listener to proxy to.
+    TLS_UI_UPSTREAM: str = os.getenv("QUANSEC_TLS_UI_UPSTREAM", "127.0.0.1:3000")
+    TLS_PORTAL_ACCESS_LOG: str = _runtime_path(
+        "QUANSEC_TLS_PORTAL_ACCESS_LOG", "logs/access-portal.json.log", TLS_RUNTIME_DIR
+    )
 
     TLS_TIMEOUT: int = int(os.getenv("QUANSEC_TLS_TIMEOUT", "10"))
     TLS_POLL_INTERVAL: int = int(os.getenv("QUANSEC_TLS_POLL_INTERVAL", "10"))

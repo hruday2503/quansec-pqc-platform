@@ -164,10 +164,11 @@ export default function TlsOverviewPage() {
         <Panel>
           <div className="p-5">
             <div className="text-[10px] tracking-[0.18em] uppercase font-mono-display font-semibold mb-2"
-                 style={{ color: "var(--pqc-cyan-dim)" }}>Observations</div>
-            <MetricValue value={stats?.total_observations ?? 0} />
+                 style={{ color: "var(--pqc-cyan-dim)" }}>Sessions</div>
+            <MetricValue value={stats?.total_sessions ?? 0} />
             <div className="text-xs font-mono-display mt-1" style={{ color: "var(--text-tertiary)" }}>
-              {stats?.successful ?? 0} ok · {stats?.failed ?? 0} failed
+              {stats?.active_sessions ?? 0} active
+              {stats && ` · ${stats.active_window_seconds}s window`}
             </div>
           </div>
         </Panel>
@@ -175,18 +176,18 @@ export default function TlsOverviewPage() {
         <Panel>
           <div className="p-5">
             <div className="text-[10px] tracking-[0.18em] uppercase font-mono-display font-semibold mb-2"
-                 style={{ color: "var(--pqc-cyan-dim)" }}>PQC coverage</div>
+                 style={{ color: "var(--pqc-cyan-dim)" }}>Hybrid coverage</div>
             <MetricValue
-              value={stats?.pqc_coverage ?? 0}
-              unit="%"
-              tone={stats && stats.pqc_coverage > 0 ? "cyan" : "amber"}
+              value={stats?.has_evidence ? stats.hybrid_coverage : "—"}
+              unit={stats?.has_evidence ? "%" : undefined}
+              tone={stats && stats.hybrid_coverage > 0 ? "cyan" : "amber"}
             />
-            {/* A zero here is a measurement, and the UI says so rather than
-                leaving it looking like missing data. */}
+            {/* An empty table and a measured zero are different facts, and the
+                UI distinguishes them rather than printing 0% for both. */}
             <div className="text-[10px] font-mono-display mt-1 leading-snug" style={{ color: "var(--text-tertiary)" }}>
-              {stats && stats.pqc_coverage === 0
-                ? "No log line has recorded the hybrid group"
-                : `${stats?.pqc_observations ?? 0} of ${stats?.total_observations ?? 0} observations`}
+              {!stats?.has_evidence
+                ? "No session recorded yet"
+                : `${stats.hybrid_sessions} hybrid · ${stats.classical_sessions} classical · ${stats.unknown_sessions} unknown`}
             </div>
           </div>
         </Panel>
@@ -194,12 +195,15 @@ export default function TlsOverviewPage() {
         <Panel>
           <div className="p-5">
             <div className="text-[10px] tracking-[0.18em] uppercase font-mono-display font-semibold mb-2"
-                 style={{ color: "var(--pqc-cyan-dim)" }}>Request time p50</div>
-            <MetricValue value={stats?.request_time_ms_p50 ?? "—"} unit="ms" />
-            {/* $request_time covers the whole request, not the handshake alone,
-                so the panel is labelled as what it measures. */}
+                 style={{ color: "var(--pqc-cyan-dim)" }}>TLS 1.3 coverage</div>
+            <MetricValue
+              value={stats?.has_evidence ? stats.tls13_coverage : "—"}
+              unit={stats?.has_evidence ? "%" : undefined}
+              tone={stats && stats.tls13_coverage === 100 ? "cyan" : "amber"}
+            />
             <div className="text-xs font-mono-display mt-1" style={{ color: "var(--text-tertiary)" }}>
-              p95 {stats?.request_time_ms_p95 ?? "—"} ms
+              {stats?.failed_handshakes ?? 0} failed handshake
+              {stats?.failed_handshakes === 1 ? "" : "s"}
             </div>
           </div>
         </Panel>
@@ -292,22 +296,41 @@ export default function TlsOverviewPage() {
         </Panel>
       </div>
 
-      {/* ── Outcome breakdown ───────────────────────────────────────────── */}
-      {stats && Object.keys(stats.outcomes).length > 0 && (
+      {/* ── Key-establishment breakdown ─────────────────────────────────── */}
+      {stats?.has_evidence && (
         <Panel>
-          <PanelHeader eyebrow="History" title="Observation outcomes" />
+          <PanelHeader
+            eyebrow="History"
+            title="Key establishment across observed sessions"
+            right={stats.last_observed_at && (
+              <span className="text-[10px] font-mono-display" style={{ color: "var(--text-tertiary)" }}>
+                last {new Date(stats.last_observed_at).toLocaleString()}
+              </span>
+            )}
+          />
           <div className="px-5 py-4 flex flex-wrap gap-3">
-            {Object.entries(stats.outcomes).map(([outcome, count]) => (
-              <div key={outcome} className="px-3 py-2 rounded-lg"
+            {([
+              ["hybrid", stats.hybrid_sessions, "var(--pqc-cyan)"],
+              ["classical", stats.classical_sessions, "var(--threat-amber)"],
+              ["group not reported", stats.unknown_sessions, "var(--text-tertiary)"],
+            ] as const).map(([label, count, color]) => (
+              <div key={label} className="px-3 py-2 rounded-lg"
                    style={{ background: "var(--bg-panel-raised)", border: "1px solid var(--border-hairline)" }}>
-                <div className="text-[10px] font-mono-display uppercase tracking-wider"
-                     style={{ color: outcome === "success" ? "var(--pqc-cyan)" : "var(--threat-amber)" }}>
-                  {outcome.replace(/_/g, " ")}
+                <div className="text-[10px] font-mono-display uppercase tracking-wider" style={{ color }}>
+                  {label}
                 </div>
                 <div className="text-lg font-bold font-mono-display tabular-nums"
                      style={{ color: "var(--text-primary)" }}>{count}</div>
               </div>
             ))}
+          </div>
+          {/* Said explicitly, because a reader seeing "0 classical" will
+              otherwise assume classical was refused. On the portal listener it
+              is permitted; only the probes establish refusal. */}
+          <div className="px-5 pb-4 text-[11px] leading-relaxed" style={{ color: "var(--text-tertiary)" }}>
+            Counts describe what clients negotiated, not what the server required.
+            A session with no reported group was resumed and performed no key
+            exchange — that is not the same as classical.
           </div>
         </Panel>
       )}

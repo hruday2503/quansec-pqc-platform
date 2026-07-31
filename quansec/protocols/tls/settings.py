@@ -71,6 +71,16 @@ class TlsSettings:
     poll_interval: int
     log_payloads: bool
 
+    # Portal listener. Browser-reachable, deliberately NOT fail-closed, and
+    # logged to its own file so its sessions are never counted as evidence
+    # that the strict listener enforced anything.
+    portal_enabled: bool
+    portal_port: int
+    portal_groups: str
+    portal_ciphersuites: str
+    portal_access_log: str
+    ui_upstream: str
+
     @classmethod
     def from_env(cls) -> "TlsSettings":
         s = app_settings
@@ -103,6 +113,12 @@ class TlsSettings:
             timeout=s.TLS_TIMEOUT,
             poll_interval=s.TLS_POLL_INTERVAL,
             log_payloads=s.TLS_LOG_PAYLOADS,
+            portal_enabled=s.TLS_PORTAL_ENABLED,
+            portal_port=s.TLS_PORTAL_PORT,
+            portal_groups=s.TLS_PORTAL_GROUPS,
+            portal_ciphersuites=s.TLS_PORTAL_CIPHERSUITES,
+            portal_access_log=s.TLS_PORTAL_ACCESS_LOG,
+            ui_upstream=s.TLS_UI_UPSTREAM,
         )
 
     # ── Runtime introspection ─────────────────────────────────────────────────

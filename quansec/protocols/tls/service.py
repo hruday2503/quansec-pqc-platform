@@ -104,6 +104,9 @@ class TlsStatus:
 _LOG_FORMAT = """    log_format quansec_tls escape=json
         '{'
         '"timestamp":"$time_iso8601",'
+        '"connection_id":"$connection",'
+        '"connection_requests":$connection_requests,'
+        '"listener":"$server_port",'
         '"remote_addr":"$remote_addr",'
         '"remote_port":"$remote_port",'
         '"tls_protocol":"$ssl_protocol",'
@@ -115,10 +118,126 @@ _LOG_FORMAT = """    log_format quansec_tls escape=json
         '"server_name":"$ssl_server_name",'
         '"session_reused":"$ssl_session_reused",'
         '"request":"$request",'
+        '"request_method":"$request_method",'
+        '"request_uri":"$uri",'
         '"status":$status,'
         '"request_time":$request_time,'
         '"bytes_sent":$bytes_sent'
         '}';
+"""
+
+# $connection is NGINX's per-connection serial. Combined with
+# $connection_requests it distinguishes "one connection, five requests" from
+# "five connections", which is what the portal's session view needs and what a
+# per-log-line surrogate key cannot express.
+#
+# There is no NGINX variable for the server certificate's signature algorithm:
+# $ssl_ciphers and friends describe the negotiated suite, not how the
+# certificate was signed. That fact comes from certs.py inspecting the
+# certificate itself, and is joined in at the API layer — never guessed here.
+
+
+def _render_portal_server(settings: TlsSettings) -> str:
+    """
+    The browser-facing listener.
+
+    Serves the whole application over TLS 1.3 — Next.js at `/`, FastAPI under
+    `/api/`, and the live-events socket with an Upgrade — so that end-to-end
+    use of QUANSEC genuinely passes through a TLS terminator rather than
+    bypassing it on plaintext loopback ports.
+
+    Its group list is deliberately WIDER than the strict listener's. The hybrid
+    group is offered first and a browser that supports it will use it, but
+    classical fallback is permitted because otherwise no browser could connect
+    at all. That makes this listener NOT fail-closed, by construction:
+
+      * it writes to its own access log, so its sessions are collected with
+        evidence_source distinct from the strict listener's;
+      * no probe runs against it, so it can never contribute to
+        `hybrid_only_enforced`;
+      * enforcement claims are derived only from port {settings.port}.
+
+    Anyone reading a hybrid session on this listener is looking at what a
+    browser chose, not at what the server required.
+    """
+    if not settings.portal_enabled:
+        return ""
+
+    return f"""
+    # ── Portal listener — browser-facing, NOT the enforcement listener ───────
+    server {{
+        listen {settings.host}:{settings.portal_port} ssl;
+        server_name {settings.server_hostname};
+
+        access_log {settings.portal_access_log} quansec_tls;
+
+        ssl_certificate     {settings.server_cert};
+        ssl_certificate_key {settings.server_key};
+
+        ssl_protocols TLSv1.3;
+        ssl_conf_command Groups {settings.portal_groups};
+        ssl_conf_command Ciphersuites {settings.portal_ciphersuites};
+        ssl_early_data off;
+        ssl_session_tickets off;
+
+        # Uploads are small; this is an API and a dashboard.
+        client_max_body_size 2m;
+
+        # The live-events socket. Matched BEFORE /api/ so the Upgrade headers
+        # are set — a plain proxy_pass would strip them and the socket would
+        # fall back to a hanging HTTP request.
+        location /api/ws/ {{
+            proxy_pass http://{settings.upstream};
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade    $http_upgrade;
+            proxy_set_header Connection "upgrade";
+            proxy_set_header Host       $host;
+            proxy_set_header X-Real-IP  $remote_addr;
+            proxy_set_header X-Forwarded-Proto https;
+            # Long-lived by design; the default 60s would drop idle sockets.
+            proxy_read_timeout 3600s;
+            proxy_send_timeout 3600s;
+        }}
+
+        location /api/ {{
+            proxy_pass http://{settings.upstream};
+            proxy_http_version 1.1;
+            proxy_set_header Host              $host;
+            proxy_set_header X-Real-IP         $remote_addr;
+            proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+            # Tells FastAPI the client leg was TLS, so Secure cookies are set
+            # and redirects are https. Without it the app would see http.
+            proxy_set_header X-Forwarded-Proto https;
+
+            # What NGINX observed about THIS connection, for /dataplane/echo
+            # and for any endpoint that wants to report the caller's own TLS
+            # facts without trusting the caller.
+            proxy_set_header X-QUANSEC-TLS-Protocol   $ssl_protocol;
+            proxy_set_header X-QUANSEC-TLS-Cipher     $ssl_cipher;
+            proxy_set_header X-QUANSEC-TLS-Group      $ssl_curve;
+            proxy_set_header X-QUANSEC-TLS-Curves     $ssl_curves;
+            proxy_set_header X-QUANSEC-TLS-Verify     $ssl_client_verify;
+            proxy_set_header X-QUANSEC-TLS-ServerName $ssl_server_name;
+            proxy_set_header X-QUANSEC-TLS-Listener   portal;
+
+            proxy_connect_timeout 5s;
+            proxy_read_timeout 60s;
+        }}
+
+        # Next.js. Includes the dev server's HMR websocket, which is why the
+        # Upgrade headers are set here too.
+        location / {{
+            proxy_pass http://{settings.ui_upstream};
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade    $http_upgrade;
+            proxy_set_header Connection $connection_upgrade;
+            proxy_set_header Host       $host;
+            proxy_set_header X-Real-IP  $remote_addr;
+            proxy_set_header X-Forwarded-Proto https;
+            proxy_connect_timeout 5s;
+            proxy_read_timeout 60s;
+        }}
+    }}
 """
 
 
@@ -127,21 +246,33 @@ def render_config(settings: TlsSettings, *,
                   mtls: Optional[bool] = None,
                   access_log: Optional[str] = None,
                   pid_file: Optional[str] = None,
-                  error_log: Optional[str] = None) -> str:
+                  error_log: Optional[str] = None,
+                  protocols: Optional[str] = None,
+                  groups: Optional[str] = None,
+                  ciphersuites: Optional[str] = None,
+                  include_portal: bool = True) -> str:
     """
     Render the NGINX configuration.
 
     Overrides exist so the mTLS negative test can start a second instance on a
-    different port without disturbing the main one.
+    different port without disturbing the main one, and so a policy apply can
+    render a candidate config for `nginx -t` before committing to it.
+
+    `include_portal` is False for those throwaway instances: they must not bind
+    the portal port out from under the running server.
     """
     port = port if port is not None else settings.port
     mtls = settings.mtls if mtls is None else mtls
     access_log = access_log or settings.access_log
     pid_file = pid_file or settings.pid_file
     error_log = error_log or settings.error_log
+    protocols = protocols or settings.protocols
+    groups = groups or settings.groups
+    ciphersuites = ciphersuites or settings.ciphersuites
 
     runtime = settings.runtime_dir
     early_data = "on" if settings.early_data else "off"
+    portal_block = _render_portal_server(settings) if include_portal else ""
 
     mtls_block = ""
     if mtls:
@@ -159,14 +290,18 @@ def render_config(settings: TlsSettings, *,
 # next policy apply, and the config_sha256 recorded in tls_policy_state would no
 # longer match what QUANSEC believes is running.
 #
-# Enforcement, in three directives:
-#   ssl_protocols     {settings.protocols}   — nothing below TLS 1.3 is accepted
-#   Groups            {settings.groups}      — exactly one group, no fallback
-#   Ciphersuites      {settings.ciphersuites}
+# Enforcement, in three directives, on the listener at port {port}:
+#   ssl_protocols     {protocols}   — nothing below TLS 1.3 is accepted
+#   Groups            {groups}      — exactly one group, no fallback
+#   Ciphersuites      {ciphersuites}
 #
 # There is deliberately NO classical group in the list. A client offering only
 # X25519 or prime256v1 fails the handshake. That refusal is what the enforcement
 # probes verify, and it is the only thing that justifies an "enforced" status.
+#
+# The portal listener rendered below is a SEPARATE server block with a wider
+# group list, because a browser cannot negotiate the strict policy. It is never
+# probed and never contributes to an enforcement claim.
 
 worker_processes 1;
 daemon on;
@@ -182,6 +317,14 @@ http {{
     access_log off;
 
 {_LOG_FORMAT}
+    # Required by the portal listener's `/` block: maps the client's Upgrade
+    # header to the value Connection must carry, so a normal request sends
+    # `Connection: close` while a websocket sends `Connection: upgrade`.
+    map $http_upgrade $connection_upgrade {{
+        default upgrade;
+        ''      close;
+    }}
+
     client_body_temp_path {runtime}/tmp/client_body;
     proxy_temp_path       {runtime}/tmp/proxy;
     fastcgi_temp_path     {runtime}/tmp/fastcgi;
@@ -197,9 +340,9 @@ http {{
         ssl_certificate     {settings.server_cert};
         ssl_certificate_key {settings.server_key};
 
-        ssl_protocols {settings.protocols};
-        ssl_conf_command Groups {settings.groups};
-        ssl_conf_command Ciphersuites {settings.ciphersuites};
+        ssl_protocols {protocols};
+        ssl_conf_command Groups {groups};
+        ssl_conf_command Ciphersuites {ciphersuites};
         ssl_early_data {early_data};
         ssl_prefer_server_ciphers on;
         ssl_session_tickets off;
@@ -220,13 +363,13 @@ http {{
             proxy_read_timeout 10s;
         }}
 
-        # Everything else is closed. This endpoint is a measurement surface, not
-        # a general reverse proxy.
+        # Everything else is closed. THIS listener is a measurement surface, not
+        # a general reverse proxy — the portal listener below is the front door.
         location / {{
-            return 404 '{{"error":"not found","hint":"only /dataplane/ is served"}}';
+            return 404 '{{"error":"not found","hint":"only /dataplane/ is served on the strict listener"}}';
         }}
     }}
-}}
+{portal_block}}}
 """
 
 

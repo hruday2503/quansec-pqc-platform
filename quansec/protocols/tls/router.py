@@ -315,15 +315,15 @@ async def tls_readiness():
 @router.get("/stats", response_model=TlsStatsResponse, dependencies=[_read])
 async def tls_stats(conn: asyncpg.Connection = Depends(get_db)):
     """
-    Counts and percentiles over every session the collector has recorded.
+    Counts and coverage over every session the collector has recorded.
 
     The aggregate companion to /sessions: same rows, summarised. Every number
-    is a count or percentile over real log lines, so a table with no rows
-    returns zeros and null percentiles rather than anything that reads as a
-    measurement.
+    is a count over real log lines, so a table with no rows returns zeros, a
+    null last_observed_at and has_evidence=false — rather than anything that
+    reads as a measurement.
 
-    `pqc_coverage` reports what was observed, not what is required. Enforcement
-    lives on /status.hybrid_only_enforced and nowhere else.
+    `hybrid_coverage` reports what was observed, not what is required.
+    Enforcement lives on /status.hybrid_only_enforced and nowhere else.
     """
     _require_enabled()
     return await get_tls_stats(conn)

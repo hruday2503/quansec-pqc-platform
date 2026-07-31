@@ -102,6 +102,30 @@ class ParsedSession:
     log_offset: int
     raw_line: str
 
+    # ── Added in 010 ─────────────────────────────────────────────────────────
+    # NGINX's $connection: a per-connection serial. Several requests on one
+    # keep-alive connection share it, which is what makes session counting
+    # possible at all. Prefixed with the listener port when stored, so ids from
+    # the strict and portal listeners can never collide.
+    connection_id: Optional[str] = None
+    connection_requests: Optional[int] = None
+
+    # Which listener served this. The portal listener permits classical
+    # fallback, so its sessions must never be read as enforcement evidence.
+    listener_port: Optional[str] = None
+
+    request_method: Optional[str] = None
+    request_uri: Optional[str] = None
+
+    # Whether THIS handshake used the hybrid group. None when NGINX reported no
+    # group at all — not the same as False, which would assert classical.
+    hybrid_negotiated: Optional[bool] = None
+
+    # mTLS client-certificate verification. None when mTLS was not in force:
+    # $ssl_client_verify is "NONE" then, which is the absence of a check rather
+    # than a failed one, and conflating the two would invent a security event.
+    client_certificate_verified: Optional[bool] = None
+
 
 def parse_log_line(line: str, *, log_source: str, offset: int) -> Optional[ParsedSession]:
     """
@@ -157,7 +181,46 @@ def parse_log_line(line: str, *, log_source: str, offset: int) -> Optional[Parse
         log_source=log_source,
         log_offset=offset,
         raw_line=stripped[:4000],
+        connection_id=_connection_id(record),
+        connection_requests=_as_int(record.get("connection_requests")),
+        listener_port=_clean(record.get("listener")),
+        request_method=_clean(record.get("request_method")),
+        request_uri=_clean(record.get("request_uri")),
+        # Derived from the RECORDED group only. `group` is None when NGINX
+        # logged nothing, and that stays None rather than becoming False.
+        hybrid_negotiated=pqc_enabled if group else None,
+        client_certificate_verified=_verify_result(record.get("client_verify")),
     )
+
+
+def _connection_id(record: dict) -> Optional[str]:
+    """
+    Stable id for one connection, namespaced by listener.
+
+    $connection restarts from 1 when NGINX restarts, and the strict and portal
+    listeners number independently. Without the port prefix a connection on
+    8443 and one on 8444 could collide and be aggregated into a single session,
+    silently mixing enforcement evidence with browser traffic.
+    """
+    conn = _clean(record.get("connection_id"))
+    if not conn:
+        return None
+    listener = _clean(record.get("listener")) or "unknown"
+    return f"{listener}:{conn}"
+
+
+def _verify_result(raw: object) -> Optional[bool]:
+    """
+    $ssl_client_verify as a tri-state.
+
+    SUCCESS -> True, FAILED/anything else -> False, NONE/absent -> None.
+    "NONE" means no client certificate was requested, which is not a
+    verification failure and must not be recorded as one.
+    """
+    value = _clean(raw)
+    if not value or value.upper() == "NONE":
+        return None
+    return value.upper() == "SUCCESS"
 
 
 class NginxLogReader:
@@ -262,14 +325,26 @@ async def insert_sessions(conn: asyncpg.Connection,
                    negotiated_group, client_groups, client_verify, client_s_dn,
                    server_name, session_reused, http_status, request_time,
                    bytes_sent, request_line, pqc_enabled, kem_label,
-                   log_source, log_offset, raw_line
-               ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
+                   log_source, log_offset, raw_line,
+                   connection_id, hybrid_negotiated, client_certificate_verified,
+                   mtls_enabled, started_at, last_seen, request_count,
+                   evidence_source
+               ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,
+                         $18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28)
                ON CONFLICT (log_source, log_offset) DO NOTHING""",
             s.occurred_at, s.remote_addr, s.remote_port, s.tls_protocol, s.cipher,
             s.negotiated_group, s.client_groups, s.client_verify, s.client_s_dn,
             s.server_name, s.session_reused, s.http_status, s.request_time,
             s.bytes_sent, s.request_line, s.pqc_enabled, s.kem_label,
             s.log_source, s.log_offset, s.raw_line,
+            s.connection_id, s.hybrid_negotiated, s.client_certificate_verified,
+            # mTLS was in force iff NGINX ran a verification at all. Derived
+            # from the log line, not from config, so a row always reflects the
+            # listener that actually served it.
+            s.client_certificate_verified is not None,
+            s.occurred_at, s.occurred_at,
+            s.connection_requests or 1,
+            "nginx_access_log",
         )
         if result.endswith(" 1"):
             inserted += 1
@@ -300,12 +375,16 @@ async def collect_once(pool: asyncpg.Pool,
         return 0
 
     reader = NginxLogReader(settings.access_log)
-    if not os.path.isfile(settings.access_log):
+    # stat() and read() are synchronous. On a large log, or one on a stalled
+    # filesystem, calling them directly would block the event loop for every
+    # other request in the process — and a task blocked in read() cannot be
+    # cancelled, which is what wedged shutdown before main.py bounded it.
+    if not await asyncio.to_thread(os.path.isfile, settings.access_log):
         return 0
 
     async with pool.acquire() as conn:
         offset = await _read_offset(conn, settings.access_log)
-        raw_lines, new_offset = reader.read_from(offset)
+        raw_lines, new_offset = await asyncio.to_thread(reader.read_from, offset)
         if not raw_lines:
             if new_offset != offset:
                 await _write_offset(conn, settings.access_log, new_offset)

@@ -60,6 +60,11 @@ logger = logging.getLogger("quansec.main")
 
 _background_tasks: list[asyncio.Task] = []
 
+# How long shutdown waits for collectors to honour cancellation before giving
+# up on them. Long enough for a normal poll iteration to reach its next await,
+# short enough that `uvicorn --reload` is never wedged by a stuck task.
+SHUTDOWN_TIMEOUT = 5.0
+
 
 async def run_migrations(pool: asyncpg.Pool):
     """Apply SQL migrations on startup."""
@@ -102,7 +107,13 @@ async def lifespan(app: FastAPI):
     tls_settings = get_tls_settings()
     if tls_settings.enabled:
         try:
-            for warning in tls_settings.validate():
+            # validate() shells out to `nginx -V` and `openssl list -tls-groups`
+            # through a synchronous subprocess.run. Called directly it would
+            # stall the event loop during startup, and a hung binary would stall
+            # it indefinitely. to_thread keeps the loop responsive and lets the
+            # subprocess timeout do its job.
+            warnings = await asyncio.to_thread(tls_settings.validate)
+            for warning in warnings:
                 logger.warning(f"TLS: {warning}")
             logger.info(f"TLS config: {tls_settings.redacted()}")
         except TlsConfigurationError as e:
@@ -127,13 +138,35 @@ async def lifespan(app: FastAPI):
     yield
 
     # ── Shutdown ─────────────────────────────────────────────────────────────
+    #
+    # Cancellation is BOUNDED. asyncio can only deliver a cancellation at an
+    # await point, so a collector sitting in a synchronous subprocess or file
+    # read does not stop when cancel() is called — and an unbounded `await
+    # task` then blocks shutdown forever. Under `uvicorn --reload` that wedges
+    # the whole application: the reloader will not start the replacement worker
+    # until the old one exits, so every request times out, including routes
+    # that touch nothing.
+    #
+    # Cancel everything first, then wait once with a deadline. A task that
+    # misses the deadline is abandoned rather than waited on: the process is
+    # exiting, and a stuck collector must not be able to hold it open.
     logger.info("QUANSEC shutting down...")
     for task in _background_tasks:
         task.cancel()
-        try:
-            await task
-        except asyncio.CancelledError:
-            pass
+
+    if _background_tasks:
+        done, pending = await asyncio.wait(_background_tasks, timeout=SHUTDOWN_TIMEOUT)
+        for task in pending:
+            logger.warning(
+                "Collector %s did not stop within %ss — abandoning it. This means "
+                "it was blocked in a synchronous call at cancellation time.",
+                task.get_name(), SHUTDOWN_TIMEOUT,
+            )
+        for task in done:
+            # Surface a genuine crash; a cancellation is the expected outcome.
+            if not task.cancelled() and task.exception() is not None:
+                logger.error("Collector %s failed: %r", task.get_name(), task.exception())
+
     await close_pool()
     logger.info("Shutdown complete")
 

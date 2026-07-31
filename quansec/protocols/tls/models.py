@@ -120,45 +120,52 @@ class TlsReadinessResponse(BaseModel):
 
 class TlsStatsResponse(BaseModel):
     """
-    Counts and percentiles over the sessions the collector has recorded.
+    Counts and coverage over the sessions the collector has recorded.
 
-    Aggregates of observations, not of intent. `pqc_coverage` is the share of
-    observed sessions that negotiated the hybrid group; it says nothing about
-    whether a classical client would have been refused — only
+    Aggregates of observations, not of intent. `hybrid_coverage` is the share
+    of observed sessions that negotiated the hybrid group; it says nothing
+    about whether a classical client would have been refused — only
     /status.hybrid_only_enforced answers that.
 
-    With an empty table every count is 0, both percentiles are null and
-    `outcomes` is empty. That is the honest empty state, not missing data.
+    With an empty table every count is 0, `last_observed_at` is null and
+    `has_evidence` is false. That is the honest empty state, not missing data.
     """
 
-    total_observations: int
-    successful: int = Field(description="Observations logged with HTTP status < 400")
-    failed: int = Field(description="Observations logged with HTTP status >= 400")
-    unrecorded: int = Field(
-        description="Observations with no HTTP status in the log line. Not counted "
-                    "as failures, because the log does not record one."
+    # A session is one CONNECTION, not one request. See stats.py.
+    total_sessions: int
+    active_sessions: int = Field(
+        description="Sessions with a request logged inside active_window_seconds. "
+                    "NGINX logs no connection-close event, so liveness can only "
+                    "be inferred from recency."
     )
-    sessions_reused: int = Field(
-        description="Resumed sessions. These perform no key exchange, so they "
-                    "carry no negotiated group."
+    hybrid_sessions: int
+    classical_sessions: int
+    unknown_sessions: int = Field(
+        description="No group recorded. A resumed session performs no key "
+                    "exchange — this is not the same as classical."
     )
-    pqc_observations: int
-    pqc_coverage: float = Field(
-        description="pqc_observations / total_observations, as a percentage"
+    hybrid_coverage: float = Field(
+        description="hybrid_sessions as a percentage of sessions WITH a recorded "
+                    "group. Unknown-group sessions are excluded from the "
+                    "denominator rather than counted as classical."
     )
-    request_time_ms_p50: Optional[float] = Field(
-        default=None,
-        description="Median NGINX $request_time in ms — the whole request, "
-                    "handshake included. Not a handshake timing.",
+    tls13_coverage: float = Field(
+        description="Percentage of all sessions that negotiated TLS 1.3"
     )
-    request_time_ms_p95: Optional[float] = Field(
-        default=None, description="95th percentile NGINX $request_time in ms"
+    failed_handshakes: int = Field(
+        description="Probes that expected to connect and did not. A refused "
+                    "handshake writes no access-log line, so this is NOT "
+                    "countable from the log; an HTTP 5xx is a failed request on "
+                    "a SUCCESSFUL handshake and is excluded."
     )
-    outcomes: Dict[str, int] = Field(
-        default_factory=dict,
-        description="Non-zero outcome buckets: success, client_error, "
-                    "server_error, unrecorded",
+    active_alerts: int = Field(description="Unacknowledged TLS alerts")
+    last_observed_at: Optional[datetime] = None
+
+    has_evidence: bool = Field(
+        description="False when no session has ever been recorded. Lets a "
+                    "reader tell a measured zero from an empty table."
     )
+    active_window_seconds: int
 
 
 # ── Sessions ─────────────────────────────────────────────────────────────────
