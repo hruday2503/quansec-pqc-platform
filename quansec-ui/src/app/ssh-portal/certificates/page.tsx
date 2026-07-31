@@ -3,11 +3,13 @@
 import { useEffect, useState } from "react";
 import { Panel, PanelHeader } from "@/components/ui-primitives";
 import { ShieldCheck, Copy, Check, Download, KeyRound, AlertTriangle, Fingerprint } from "lucide-react";
+import { authHeaders as bearerHeaders } from "@/lib/auth-fetch";
 
 const API_BASE = process.env.NEXT_PUBLIC_QUANSEC_API || "http://localhost:8000";
 function authHeaders(json = false): HeadersInit {
-  const token = typeof window !== "undefined" ? localStorage.getItem("quansec_token") : null;
-  const h: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+  // Authorization comes from the in-memory access token; see
+  // src/lib/auth-fetch.ts. Nothing is read from localStorage.
+  const h: Record<string, string> = { ...bearerHeaders() };
   if (json) h["Content-Type"] = "application/json";
   return h;
 }

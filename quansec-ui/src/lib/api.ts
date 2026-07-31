@@ -72,6 +72,267 @@ export interface AttackResult {
   [key: string]: unknown;
 }
 
+// ── TLS ──────────────────────────────────────────────────────────────────────
+//
+// Post-quantum status has two independent axes and both must be rendered.
+// `availability` says whether the runtime can do the hybrid group and whether a
+// real negotiation was verified out of band. `enforcement` says whether hybrid
+// is mandatory — it never is today, because Python's ssl module cannot select
+// TLS 1.3 groups, so a classical-only client still connects. A high
+// availability is therefore NOT a guarantee.
+//
+// Prefer `label` for display text: it is generated server-side and always
+// carries the enforcement qualifier, so the UI cannot accidentally render a
+// bare reassurance.
+
+/**
+ * TLS types — these mirror protocols/tls/models.py exactly.
+ *
+ * The status booleans are deliberately NOT collapsed into a single flag. They
+ * answer different questions and only some are guarantees:
+ *
+ *   hybrid_group_configured   we asked NGINX for the hybrid group (an intention)
+ *   hybrid_group_negotiated   a real handshake used it (per the NGINX log)
+ *   hybrid_only_enforced      classical clients were actually refused
+ *
+ * Only the third is a guarantee. Rendering the first as "protected" would be a
+ * claim the evidence does not support.
+ */
+export interface TlsStatus {
+  enabled: boolean;
+  runtime_supported: boolean;
+  tls13_enforced: boolean;
+  hybrid_group_configured: boolean;
+  hybrid_group_negotiated: boolean;
+  hybrid_only_enforced: boolean;
+  certificate_verified: boolean;
+  mtls_enabled: boolean;
+  /** The CERTIFICATE's signature algorithm. Hybrid key exchange does not set this. */
+  authentication_quantum_safe: boolean;
+  overall_status:
+    | "unavailable"
+    | "classical"
+    | "configured_unproven"
+    | "hybrid_observed"
+    | "hybrid_enforced"
+    | "degraded";
+  label: string;
+  service: {
+    host: string;
+    port: number;
+    running: boolean;
+    pid: number | null;
+    listening: boolean;
+    config_path: string | null;
+    config_sha256: string | null;
+    error: string | null;
+  };
+  build: {
+    runtime_dir: string;
+    nginx_binary: string;
+    nginx_version: string | null;
+    /** The load-bearing value: NGINX built against 3.0 cannot enforce the group. */
+    nginx_openssl: string | null;
+    openssl_binary: string;
+    openssl_version: string | null;
+    system_openssl: string | null;
+    hybrid_group_available: boolean;
+    runtime_built: boolean;
+  };
+  evidence: {
+    observed_hybrid_sessions: number;
+    probe_results: Record<string, boolean>;
+    configured_groups: string;
+    configured_protocols: string | null;
+    configured_ciphersuites: string | null;
+    config_sha256: string | null;
+    [key: string]: unknown;
+  };
+  last_updated: string;
+}
+
+/**
+ * Aggregates over observed sessions. Mirrors TlsStatsResponse in
+ * protocols/tls/models.py field for field.
+ *
+ * `pqc_coverage` is a share of what was OBSERVED. It is not enforcement — a
+ * hundred percent coverage still permits a classical client unless
+ * TlsStatus.hybrid_only_enforced is true.
+ */
+export interface TlsStats {
+  total_observations: number;
+  /** Logged with HTTP status < 400. */
+  successful: number;
+  /** Logged with HTTP status >= 400. */
+  failed: number;
+  /** No HTTP status in the log line. Not a failure — the log records none. */
+  unrecorded: number;
+  /** Resumed sessions, which perform no key exchange and carry no group. */
+  sessions_reused: number;
+  pqc_observations: number;
+  pqc_coverage: number;
+  /**
+   * Percentiles over NGINX `$request_time`, which spans the whole request —
+   * handshake plus HTTP exchange. Null until a session has been observed.
+   */
+  request_time_ms_p50: number | null;
+  request_time_ms_p95: number | null;
+  /** Non-zero buckets only: success | client_error | server_error | unrecorded. */
+  outcomes: Record<string, number>;
+}
+
+export interface TlsReadinessCheck {
+  check: string;
+  passed: boolean;
+  detail: string;
+}
+
+export interface TlsReadiness {
+  ready: boolean;
+  checks: TlsReadinessCheck[];
+  blocking: string[];
+  warnings: string[];
+  runtime: Record<string, unknown>;
+}
+
+/** One session, parsed from a line NGINX wrote. Never synthesised. */
+export interface TlsSession {
+  id: number;
+  occurred_at: string;
+  remote_addr: string | null;
+  remote_port: string | null;
+  tls_protocol: string | null;
+  cipher: string | null;
+  /** $ssl_curve as logged. Null for a resumed session, which performs no key exchange. */
+  negotiated_group: string | null;
+  client_groups: string | null;
+  client_verify: string | null;
+  client_s_dn: string | null;
+  server_name: string | null;
+  session_reused: boolean;
+  http_status: number | null;
+  request_time: number | null;
+  bytes_sent: number | null;
+  request_line: string | null;
+  pqc_enabled: boolean;
+  kem_label: string | null;
+  log_source: string | null;
+  log_offset: number | null;
+  recorded_at: string | null;
+  raw_line?: string | null;
+}
+
+export interface TlsEvent {
+  id: number;
+  event_type: string;
+  severity: "info" | "warning" | "critical";
+  summary: string;
+  detail: Record<string, unknown> | null;
+  occurred_at: string;
+}
+
+export interface TlsPolicyView {
+  source: string;
+  protocols: string;
+  groups: string;
+  ciphersuites: string;
+  mtls: boolean;
+  early_data: boolean;
+  listen: string | null;
+  config_sha256: string | null;
+  tls13_only: boolean;
+  hybrid_group_only: boolean;
+  fail_closed: boolean;
+  fallback_groups: string[];
+}
+
+export interface TlsPolicy {
+  intended: TlsPolicyView;
+  /** Null when no nginx.conf has been rendered — distinct from "running something else". */
+  running: TlsPolicyView | null;
+  drift: {
+    in_sync: boolean;
+    reason: string;
+    detail: string;
+    differences: { field: string; intended: unknown; running: unknown }[];
+    intended_sha256?: string | null;
+    running_sha256?: string | null;
+  };
+  active_state: Record<string, unknown> | null;
+  fail_closed: boolean;
+}
+
+export interface TlsCertificate {
+  server_name: string;
+  subject: string | null;
+  issuer: string | null;
+  serial_number: string | null;
+  signature_algorithm: string | null;
+  public_key_algorithm: string | null;
+  key_size: number | null;
+  san: string[];
+  not_before: string | null;
+  not_after: string | null;
+  days_until_expiry: number | null;
+  chain_verified: boolean;
+  pqc_signature: boolean;
+  authentication_class: string;
+  note: string;
+}
+
+export interface TlsSignatureAlgorithms {
+  openssl_binary: string;
+  total_advertised: number;
+  ml_dsa_advertised: string[];
+  ml_dsa_available: boolean;
+  note: string;
+}
+
+/** `passed` is relative to `expected_outcome`: a negative probe passes when REFUSED. */
+export interface TlsProbeResult {
+  probe_type: string;
+  expected_outcome: "connect" | "reject";
+  actual_outcome: "connect" | "reject" | "error";
+  passed: boolean;
+  description: string;
+  target_host: string;
+  target_port: number;
+  negotiated_group: string | null;
+  negotiated_cipher: string | null;
+  tls_protocol: string | null;
+  verify_result: string | null;
+  http_status: number | null;
+  openssl_binary: string;
+  openssl_version: string | null;
+  command: string;
+  exit_code: number | null;
+  stdout_excerpt: string | null;
+  evidence_path: string | null;
+  duration_ms: number | null;
+  run_at: string | null;
+}
+
+export interface TlsProbeSuite {
+  total: number;
+  passed: number;
+  failed: number;
+  results: TlsProbeResult[];
+  /** The only field that justifies showing "ENFORCED". */
+  enforcement_proven: boolean;
+  summary: string;
+}
+
+export interface TlsDowngradeTest {
+  test: string;
+  /** True means the downgrade attempt FAILED — the desired outcome. */
+  rejected: boolean;
+  description: string;
+  results: TlsProbeResult[];
+  verdict: string;
+}
+
+// ── API keys ─────────────────────────────────────────────────────────────
+
 export interface ApiKey {
   id: number;
   name: string;
@@ -82,44 +343,150 @@ export interface ApiKey {
   revoked: boolean;
 }
 
-export interface ApiKeyCreated extends ApiKey {
+export interface ApiKeyCreated {
+  id: number;
+  name: string;
+  /** Returned once and never again. */
   api_key: string;
+  key_prefix: string;
+  scopes: string[];
+  created_at: string;
   warning: string;
 }
 
 class QuansecClient {
+  /** In memory only. Never persisted. */
   private token: string | null = null;
+  /** Read from the readable CSRF cookie; echoed on cookie-authenticated calls. */
+  private csrfToken: string | null = null;
+  /** De-duplicates concurrent refreshes so parallel 401s trigger only one. */
+  private refreshInFlight: Promise<boolean> | null = null;
+
+  private readonly LEGACY_TOKEN_KEY = "quansec_token";
 
   setToken(token: string) {
     this.token = token;
-    if (typeof window !== "undefined") {
-      localStorage.setItem("quansec_token", token);
-    }
   }
 
+  getToken(): string | null {
+    return this.token;
+  }
+
+  /**
+   * Deprecated. Older pages call this expecting a token from localStorage.
+   * Retained so they compile, but it no longer reads storage — use `restore()`.
+   */
   loadToken(): string | null {
-    if (typeof window !== "undefined") {
-      this.token = localStorage.getItem("quansec_token");
-    }
     return this.token;
   }
 
   clearToken() {
     this.token = null;
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("quansec_token");
+    this.csrfToken = null;
+    this.purgeLegacyStorage();
+  }
+
+  /** Remove any access token left in localStorage by an older build. */
+  private purgeLegacyStorage() {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.removeItem(this.LEGACY_TOKEN_KEY);
+      window.sessionStorage.removeItem(this.LEGACY_TOKEN_KEY);
+    } catch {
+      /* storage disabled — nothing to purge */
     }
   }
 
-  private async request<T>(path: string, options: RequestInit = {}): Promise<T> {
-    const res = await fetch(`${API_BASE}${path}`, {
-      ...options,
-      headers: {
-        ...(this.token ? { Authorization: `Bearer ${this.token}` } : {}),
-        ...(options.body ? { "Content-Type": "application/json" } : {}),
-        ...options.headers,
-      },
-    });
+  /** The CSRF cookie is deliberately readable; that is how double-submit works. */
+  private readCsrfCookie(): string | null {
+    if (typeof document === "undefined") return null;
+    const match = document.cookie.match(/(?:^|;\s*)quansec_csrf=([^;]+)/);
+    return match ? decodeURIComponent(match[1]) : null;
+  }
+
+  private csrfHeaders(): Record<string, string> {
+    const value = this.csrfToken ?? this.readCsrfCookie();
+    return value ? { "X-CSRF-Token": value } : {};
+  }
+
+  /**
+   * Re-establish a session after a page load, using the refresh cookie.
+   * Returns false when there is no usable session and the user must log in.
+   */
+  async restore(): Promise<boolean> {
+    this.purgeLegacyStorage();
+    return this.refresh();
+  }
+
+  /**
+   * Exchange the refresh cookie for a new access token.
+   *
+   * Concurrent callers share one in-flight request: the refresh token rotates
+   * on every use, so two parallel refreshes would make the second present an
+   * already-rotated token and trip the reuse detector, logging the user out.
+   */
+  async refresh(): Promise<boolean> {
+    if (this.refreshInFlight) return this.refreshInFlight;
+
+    this.refreshInFlight = (async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/auth/refresh`, {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json", ...this.csrfHeaders() },
+          body: "{}",
+        });
+        if (!res.ok) {
+          this.token = null;
+          return false;
+        }
+        const data = await res.json();
+        this.token = data.access_token;
+        if (data.csrf_token) this.csrfToken = data.csrf_token;
+        return true;
+      } catch {
+        this.token = null;
+        return false;
+      } finally {
+        this.refreshInFlight = null;
+      }
+    })();
+
+    return this.refreshInFlight;
+  }
+
+  /**
+   * Perform an authenticated request, refreshing once on a 401.
+   *
+   * The retry is what makes a 15-minute access token invisible to the user: the
+   * token expires mid-session, one call fails, the cookie buys a new one, and
+   * the call succeeds. `retry` guards against looping when the session is
+   * genuinely dead.
+   */
+  private async request<T>(
+    path: string,
+    options: RequestInit = {},
+    retry = true
+  ): Promise<T> {
+    const send = () =>
+      fetch(`${API_BASE}${path}`, {
+        ...options,
+        credentials: "include",
+        headers: {
+          ...(this.token ? { Authorization: `Bearer ${this.token}` } : {}),
+          ...(options.body ? { "Content-Type": "application/json" } : {}),
+          ...options.headers,
+        },
+      });
+
+    let res = await send();
+
+    if (res.status === 401 && retry) {
+      if (await this.refresh()) {
+        res = await send();
+      }
+    }
+
     if (!res.ok) {
       const body = await res.text();
       throw new Error(`${res.status}: ${body}`);
@@ -128,22 +495,72 @@ class QuansecClient {
   }
 
   async login(email: string, password: string, portal?: string) {
-    const url = portal
+    const base = portal
       ? `${API_BASE}/api/auth/login-scoped?portal=${encodeURIComponent(portal)}`
       : `${API_BASE}/api/auth/login`;
+    // use_cookie=true: the refresh token comes back as an HttpOnly cookie and
+    // is deliberately absent from the response body.
+    const url = `${base}${base.includes("?") ? "&" : "?"}use_cookie=true`;
+
     const res = await fetch(url, {
       method: "POST",
+      credentials: "include",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: `username=${encodeURIComponent(email)}&password=${encodeURIComponent(password)}`,
     });
-    if (!res.ok) throw new Error("Login failed");
+    if (!res.ok) {
+      // The backend returns one generic message for every credential failure,
+      // so there is nothing more specific to surface here.
+      throw new Error("Login failed");
+    }
+
     const data = await res.json();
-    this.setToken(data.access_token);
+    this.token = data.access_token;
+    this.csrfToken = data.csrf_token ?? null;
+    this.purgeLegacyStorage();
     return data;
   }
 
+  /** Revoke this session server-side and clear local state. */
+  async logout() {
+    try {
+      await fetch(`${API_BASE}/api/auth/logout`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json", ...this.csrfHeaders() },
+        body: "{}",
+      });
+    } catch {
+      /* clear local state regardless */
+    }
+    this.clearToken();
+  }
+
+  /** Revoke every session for this user, on all devices. */
+  async revokeAll() {
+    const result = await this.request<{ revoked: number; detail: string }>(
+      "/api/auth/revoke-all",
+      { method: "POST" }
+    );
+    this.clearToken();
+    return result;
+  }
+
+  /** Live sessions for the current user. */
+  async sessions() {
+    return this.request<Record<string, unknown>[]>("/api/auth/sessions");
+  }
+
   async me() {
-    return this.request<{ id: number; email: string; role: string }>("/api/auth/me");
+    return this.request<{
+      id: number;
+      email: string;
+      role: string;
+      portal: string | null;
+      scopes: string[];
+      scope_descriptions: Record<string, string>;
+      auth_method: string;
+    }>("/api/auth/me");
   }
 
   async getStats() {
@@ -183,19 +600,133 @@ class QuansecClient {
     );
   }
 
-  async createApiKey(name: string, scopes: string[] = ["read"]) {
+  // ── TLS ────────────────────────────────────────────────────────────────
+  //
+  // These mirror protocols/tls/router.py. The endpoints of the earlier
+  // Python-`ssl` generation (/test-connection, /session, /policies/compare,
+  // /hybrid/verify) no longer exist and returned 404; the NGINX data plane
+  // replaced them with evidence-derived equivalents.
+
+  /** The nine evidence-derived status fields. */
+  async getTlsStatus() {
+    return this.request<TlsStatus>("/api/tls/status");
+  }
+
+  /** Counts and percentiles over the sessions the collector has recorded. */
+  async getTlsStats() {
+    return this.request<TlsStats>("/api/tls/stats");
+  }
+
+  /** Whether the data plane can be relied on, and what is blocking it. */
+  async getTlsReadiness() {
+    return this.request<TlsReadiness>("/api/tls/readiness");
+  }
+
+  /** Observed sessions, each parsed from a real NGINX log line. */
+  async getTlsSessions(limit = 50) {
+    return this.request<TlsSession[]>(`/api/tls/sessions?limit=${limit}`);
+  }
+
+  /** One session, including the raw log line it came from. */
+  async getTlsSession(id: number) {
+    return this.request<TlsSession>(`/api/tls/sessions/${id}`);
+  }
+
+  /** Service, policy and probe lifecycle events. */
+  async getTlsEvents(limit = 50) {
+    return this.request<TlsEvent[]>(`/api/tls/events?limit=${limit}`);
+  }
+
+  /** Intended vs running policy, and the drift between them. */
+  async getTlsPolicy() {
+    return this.request<TlsPolicy>("/api/tls/policy");
+  }
+
+  /** Certificate facts. Authentication is reported separately from key exchange. */
+  async getTlsCertificate() {
+    return this.request<TlsCertificate>("/api/tls/certificate");
+  }
+
+  /** What the runtime OpenSSL advertises — input to the ML-DSA research profile. */
+  async getTlsSignatureAlgorithms() {
+    return this.request<TlsSignatureAlgorithms>("/api/tls/signature-algorithms");
+  }
+
+  // ── Admin actions (tls:admin) ──────────────────────────────────────────
+
+  /** Render, validate and reload the policy. */
+  async applyTlsPolicy(reload = true) {
+    return this.request<Record<string, unknown>>("/api/tls/policy/apply", {
+      method: "POST",
+      body: JSON.stringify({ reload }),
+    });
+  }
+
+  /** Control the NGINX data plane. */
+  async tlsService(action: "start" | "stop" | "reload") {
+    return this.request<Record<string, unknown>>(`/api/tls/service/${action}`, {
+      method: "POST",
+    });
+  }
+
+  /**
+   * Run enforcement probes. Omit `probeType` for the whole standard suite.
+   *
+   * A negative probe PASSES when the handshake is refused — that asymmetry is
+   * the point, and `enforcement_proven` is the only field that justifies
+   * showing enforcement in the UI.
+   */
+  async runTlsProbe(probeType?: string, includeMtls = false) {
+    return this.request<TlsProbeSuite>("/api/tls/probe", {
+      method: "POST",
+      body: JSON.stringify({ probe_type: probeType ?? null, include_mtls: includeMtls }),
+    });
+  }
+
+  /** The mandatory fail-closed proof: X25519-only AND prime256v1-only refused. */
+  async testHybridDowngrade() {
+    return this.request<TlsDowngradeTest>("/api/tls/tests/hybrid-downgrade", {
+      method: "POST",
+    });
+  }
+
+  async testTls12Downgrade() {
+    return this.request<TlsDowngradeTest>("/api/tls/tests/tls12-downgrade", {
+      method: "POST",
+    });
+  }
+
+  async testCipherDowngrade() {
+    return this.request<TlsDowngradeTest>("/api/tls/tests/cipher-downgrade", {
+      method: "POST",
+    });
+  }
+
+  // ── API keys ───────────────────────────────────────────────────────────
+
+  async listApiKeys() {
+    return this.request<ApiKey[]>("/api/keys");
+  }
+
+  /**
+   * Generate an API key. The raw key is returned ONCE and never again.
+   *
+   * `scopes` may only narrow the caller's own authority — the backend
+   * intersects the request with the owner's role scopes, so a key can never
+   * grant more than the user who created it holds. Omitted or empty means the
+   * backend grants the caller's `:read` scopes only, per auth_api_keys.py.
+   */
+  async createApiKey(name: string, scopes: string[] = []) {
     return this.request<ApiKeyCreated>("/api/keys", {
       method: "POST",
       body: JSON.stringify({ name, scopes }),
     });
   }
 
-  async listApiKeys() {
-    return this.request<ApiKey[]>("/api/keys");
-  }
-
   async revokeApiKey(id: number) {
-    return this.request<{ status: string }>(`/api/keys/${id}`, { method: "DELETE" });
+    return this.request<{ status: string; key_id: number }>(`/api/keys/${id}`, {
+      method: "DELETE",
+    });
   }
 
   connectLiveSocket(onMessage: (data: Record<string, unknown>) => void): WebSocket | null {

@@ -3,12 +3,9 @@
 import { useEffect, useState } from "react";
 import { Panel, PanelHeader } from "@/components/ui-primitives";
 import { Bell, BellOff, AlertTriangle, ShieldAlert, Check } from "lucide-react";
+import { authHeaders } from "@/lib/auth-fetch";
 
 const API_BASE = process.env.NEXT_PUBLIC_QUANSEC_API || "http://localhost:8000";
-function authHeaders(): HeadersInit {
-  const token = typeof window !== "undefined" ? localStorage.getItem("quansec_token") : null;
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
 
 interface Alert {
   id: number; rule: string; severity: string; protocol: string;

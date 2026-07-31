@@ -10,16 +10,17 @@ Complete endpoint reference for the QUANSEC backend.
 - [4. API keys](#4-api-keys)
 - [5. IPsec](#5-ipsec)
 - [6. SSH](#6-ssh)
-- [7. Zero Trust](#7-zero-trust)
-- [8. Certificate authority](#8-certificate-authority)
-- [9. Scoring](#9-scoring)
-- [10. Alerts](#10-alerts)
-- [11. Fail-mode](#11-fail-mode)
-- [12. SIEM export](#12-siem-export)
-- [13. Metrics](#13-metrics)
-- [14. WebSocket](#14-websocket)
-- [15. System](#15-system)
-- [16. Errors](#16-errors)
+- [7. TLS](#7-tls)
+- [8. Zero Trust](#8-zero-trust)
+- [9. Certificate authority](#9-certificate-authority)
+- [10. Scoring](#10-scoring)
+- [11. Alerts](#11-alerts)
+- [12. Fail-mode](#12-fail-mode)
+- [13. SIEM export](#13-siem-export)
+- [14. Metrics](#14-metrics)
+- [15. WebSocket](#15-websocket)
+- [16. System](#16-system)
+- [17. Errors](#17-errors)
 
 ---
 
@@ -98,7 +99,7 @@ curl -X POST localhost:8000/api/auth/login \
 
 `401` on bad credentials. A successful login writes an `audit_events` row.
 
-### `POST /api/auth/login-scoped?portal={ipsec|ssh}`
+### `POST /api/auth/login-scoped?portal={ipsec|ssh|tls}`
 
 Portal-scoped login. Same form body. Rejects with `403` when the user's
 `users.portal` is neither the requested portal nor `main`. Admins bypass the
@@ -316,7 +317,164 @@ KEX (falling back to `sshd -T`) and branches. `404` on an unknown name.
 
 ---
 
-## 7. Zero Trust
+## 7. TLS
+
+The TLS module observes a **real TLS 1.3 service that QUANSEC runs as a separate
+process** on its own port. Every value below was read off a live socket.
+
+> **Before quoting any post-quantum figure from these endpoints:** hybrid key
+> exchange is **not enforced**, and the negotiated TLS 1.3 group is not
+> observable from Python. See the `hybrid` block, and
+> [protocols/TLS.md](protocols/TLS.md) for the full picture.
+
+| Method | Path | Auth | Returns |
+|---|---|---|---|
+| `GET` | `/api/tls/status` | user | Service reachability, runtime facts, hybrid state |
+| `POST` | `/api/tls/test-connection` | user | Performs a real handshake and records it |
+| `GET` | `/api/tls/session` | user | Most recent recorded observation |
+| `GET` | `/api/tls/sessions` | user | `?limit=&pqc=&outcome=` |
+| `GET` | `/api/tls/stats` | user | Aggregates over recorded observations |
+| `GET` | `/api/tls/certificate` | user | Certificate facts + chain verification |
+| `GET` | `/api/tls/policies/compare` | user | Classical vs hybrid + CNSA countdown |
+| `POST` | `/api/tls/hybrid/verify` | **admin** | Runs `openssl s_client`, stores evidence |
+
+### The `hybrid` block
+
+Returned by `/status`, `/test-connection`, `/stats` and `/policies/compare`. Two
+independent axes — a high `availability` is **not** a guarantee, because
+`enforcement` is always `not_enabled`.
+
+| `availability` | Meaning |
+|---|---|
+| `unavailable` | Linked OpenSSL < 3.5.5, or the group is absent from `openssl list -tls-groups` |
+| `supported` | The group exists in this runtime. Nothing more is known |
+| `negotiated_verified` | A stored evidence row proves a real handshake used it |
+
+```jsonc
+"hybrid": {
+  "availability": "unavailable",
+  "enforcement": "not_enabled",
+  "enforcement_reason": "python-ssl-cannot-select-tls13-groups",
+  "configured_group": "X25519MLKEM768",   // requested, never proof of use
+  "required": false,
+  "runtime_group_listed": false,
+  "linked_openssl": "OpenSSL 3.0.13 30 Jan 2024",
+  "minimum_openssl_for_hybrid": "3.5.5",
+  "verification_method": "openssl s_client -groups <group> -brief",
+  "last_external_verification": null,
+  "label": "Hybrid unavailable - runtime does not provide X25519MLKEM768"
+}
+```
+
+Render `label` rather than composing your own sentence: it is generated in one
+place and always carries the enforcement qualifier.
+
+### `GET /api/tls/status`
+
+```jsonc
+{
+  "enabled": true,
+  "service": {
+    "configured_host": "127.0.0.1", "configured_port": 8443,
+    "reachable": true, "probe_ms": 4.2, "mtls_required": false, "error": null
+  },
+  "runtime": {
+    "python_ssl_openssl": "OpenSSL 3.0.13 30 Jan 2024",
+    "openssl_cli": "OpenSSL 3.0.13 30 Jan 2024",
+    "tls13_available": true,
+    "tls_groups_listed": 0
+  },
+  "hybrid": { /* see above */ },
+  "last_updated": "2026-07-30T09:00:43Z"
+}
+```
+
+Reachability is a TCP probe, not a handshake, so this is cheap enough to poll.
+It returns `200` even when the service is down — `reachable: false` **is** the
+answer.
+
+### `POST /api/tls/test-connection`
+
+Body is optional: `{"message": "..."}`, at most 4096 bytes when UTF-8 encoded.
+
+```jsonc
+{
+  "success": true,
+  "outcome": "success",
+  "tls_version": "TLSv1.3",
+  "cipher_name": "TLS_AES_256_GCM_SHA384",
+  "cipher_bits": 256,
+  "negotiated_group": null,                              // see below
+  "negotiated_group_source": "unavailable-python-ssl",
+  "mtls_used": false,
+  "peer_cert": { "cn": "localhost", "issuer_cn": "QUANSEC TLS Development Root CA",
+                 "not_before": "...", "not_after": "...",
+                 "san": ["DNS:localhost", "IP Address:127.0.0.1"] },
+  "cert_verified": true,
+  "handshake_ms": 4.31,
+  "round_trip_ms": 6.1,
+  "echo_received": true,
+  "hybrid": { /* ... */ },
+  "observed_at": "2026-07-30T09:00:43Z"
+}
+```
+
+`negotiated_group` is **always `null`** — Python's `ssl` module has no API for
+it. `negotiated_group_source` distinguishes "we cannot tell" from "no group was
+used", which are very different findings.
+
+The payload is never echoed back. `echo_received` reports only that the service
+answered, so a response cannot leak what was sent.
+
+**Failed handshakes are persisted before the error is raised**, then mapped:
+
+| Outcome | Status |
+|---|---|
+| `unreachable`, `config_error` | `503` |
+| `cert_failed`, `handshake_failed` | `502` |
+| `timeout` | `504` |
+
+### `GET /api/tls/certificate`
+
+Certificate facts plus a real `openssl verify` against the configured CA.
+`pqc_signature` comes from a signature-OID lookup, so it will report `true` the
+day ML-DSA certificates exist — today it is `false`.
+
+There is deliberately **no `POST`**. Generating certificates rotates the trust
+anchor for the whole module and lives in `scripts/generate_tls_certs.py`, which
+requires shell access.
+
+### `POST /api/tls/hybrid/verify` — **admin**
+
+Runs the OpenSSL CLI against the TLS service and records what it reported. This
+is the only thing that can move `availability` to `negotiated_verified`.
+
+A negative result returns **`200`**, not an error: "we asked for
+`X25519MLKEM768` and did not get it" is a finding worth recording.
+
+```jsonc
+{
+  "verified": false,
+  "requested_group": "X25519MLKEM768",
+  "negotiated_group": null,
+  "target_host": "127.0.0.1", "target_port": 8443,
+  "method": "openssl-s_client",
+  "openssl_version": "OpenSSL 3.0.13 30 Jan 2024",
+  "evidence_line": "unknown option -groups X25519MLKEM768",
+  "verified_at": "2026-07-30T09:12:00Z",
+  "hybrid": { /* recomputed after the evidence was stored */ }
+}
+```
+
+### No `POST /api/tls/policies/apply`
+
+The other protocol modules have one. TLS does not, because there is nothing to
+apply: Python's `ssl` module cannot select TLS 1.3 groups, so the button would
+change nothing while implying enforcement.
+
+---
+
+## 8. Zero Trust
 
 | Method | Path | Returns |
 |---|---|---|
@@ -342,7 +500,7 @@ intended posture, not live reads of `sshd_config`.
 
 ---
 
-## 8. Certificate authority
+## 9. Certificate authority
 
 ### `GET /api/ssh/ca/info`
 
@@ -374,13 +532,20 @@ Last 50 issued certificates with a computed `expired` flag. Note that
 
 ---
 
-## 9. Scoring
+## 10. Scoring
 
 | Method | Path |
 |---|---|
 | `GET` | `/api/scoring/ipsec` |
 | `GET` | `/api/scoring/ssh` |
+| `GET` | `/api/scoring/tls` |
 | `GET` | `/api/scoring/overall` |
+
+`/api/scoring/tls` uses the same weights, with one deliberate difference:
+`downgrade_resistant` is always `false`, because hybrid key exchange is not
+enforced. Awarding that 15% would inflate the score with a property the platform
+does not have. With no observations recorded it returns a defined zero plus a
+`note`, rather than inventing a grade.
 
 ```json
 {"protocol":"ssh","score":92.5,"grade":"A",
@@ -416,7 +581,7 @@ scorer falls back to *all* rows rather than reporting nothing; and with zero row
 
 ---
 
-## 10. Alerts
+## 11. Alerts
 
 | Method | Path | Auth |
 |---|---|---|
@@ -447,7 +612,7 @@ alert stays until acknowledged.
 
 ---
 
-## 11. Fail-mode
+## 12. Fail-mode
 
 | Method | Path | Auth |
 |---|---|---|
@@ -455,10 +620,13 @@ alert stays until acknowledged.
 | `POST` | `/api/failmode/set` | **admin** |
 
 ```json
-{"ssh":{"mode":"fail-closed","kex":"mlkem768x25519-sha256",
+{"ssh":{"mode":"fail-closed","enforceable":true,"kex":"mlkem768x25519-sha256",
         "desc":"PQC only — classical refused"},
- "ipsec":{"mode":"fail-closed","proposal":"aes256-sha256-mlkem1024",
+ "ipsec":{"mode":"fail-closed","enforceable":true,"proposal":"aes256-sha256-mlkem1024",
           "desc":"PQC only — classical refused"},
+ "tls":{"mode":"fail-closed","enforceable":false,"groups":"X25519MLKEM768",
+        "desc":"PQC only — classical refused",
+        "note":"Advisory only. QUANSEC cannot enforce TLS 1.3 group selection through Python's ssl module..."},
  "recommendation":"fail-closed for maximum quantum safety; fail-open only where uptime outweighs downgrade risk"}
 ```
 
@@ -472,9 +640,14 @@ an in-memory dict that resets to `fail-closed` on restart, and the response says
 so: *"Apply via the protocol policy engine to enforce on the live daemon."* Use
 `/api/{ipsec,ssh}/policies/apply` to change actual behaviour.
 
+For **TLS the gap is permanent, not a wiring gap**: `enforceable: false` because
+Python's `ssl` module has no TLS 1.3 group-selection API, so there is no policy
+engine to apply it with. Enforcement would require OpenSSL `SSL_CONF`, native
+bindings, or a terminating proxy.
+
 ---
 
-## 12. SIEM export
+## 13. SIEM export
 
 | Method | Path |
 |---|---|
@@ -495,7 +668,7 @@ events. Fixing it is a one-word change in `protocols/siem/router.py`.
 
 ---
 
-## 13. Metrics
+## 14. Metrics
 
 `GET /metrics` — Prometheus text exposition. **No authentication** (scrapers do
 not carry bearer tokens); restrict at the network layer.
@@ -509,6 +682,13 @@ quansec_ipsec_tunnels_pqc 1
 quansec_ipsec_pqc_coverage_percent 100.0
 quansec_ipsec_bytes_in_total 8432
 quansec_ipsec_bytes_out_total 8432
+quansec_tls_handshakes_total 42
+quansec_tls_handshakes_successful 38
+quansec_tls_handshakes_pqc 0
+quansec_tls_pqc_coverage_percent 0.0
+quansec_tls_handshake_duration_ms 4.31
+quansec_tls_hybrid_verifications_total 0
+quansec_tls_hybrid_enforced 0
 quansec_ssh_sessions_total 3
 quansec_ssh_sessions_active 1
 quansec_ssh_sessions_pqc 1
@@ -532,7 +712,7 @@ scrape_configs:
 
 ---
 
-## 14. WebSocket
+## 15. WebSocket
 
 ```
 ws://localhost:8000/api/ws/live
@@ -571,7 +751,7 @@ payload.
 
 ---
 
-## 15. System
+## 16. System
 
 ### `GET /health`
 
@@ -589,7 +769,7 @@ Service banner: name, version, docs link, protocol list.
 
 ---
 
-## 16. Errors
+## 17. Errors
 
 | Code | Meaning | Typical cause |
 |---|---|---|

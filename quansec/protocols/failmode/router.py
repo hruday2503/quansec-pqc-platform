@@ -46,17 +46,42 @@ MODES = {
         "fail-closed": {"proposal": "aes256-sha256-mlkem1024", "desc": "PQC only — classical refused"},
         "fail-open": {"proposal": "aes256-sha256-mlkem1024,aes256-sha256-x25519", "desc": "PQC preferred, classical fallback"},
     },
+    # TLS is ADVISORY ONLY. Unlike sshd and StrongSwan, whose config files
+    # QUANSEC rewrites and reloads, the TLS 1.3 group list is not reachable from
+    # Python — the ssl module exposes no group-selection API. Choosing
+    # fail-closed here records an intent; it does not stop a classical-only
+    # client from connecting. Making it real needs OpenSSL SSL_CONF, native
+    # bindings, or a terminating proxy with a strict group policy.
+    "tls": {
+        "fail-closed": {"groups": "X25519MLKEM768",
+                        "desc": "PQC only — classical refused"},
+        "fail-open": {"groups": "X25519MLKEM768:X25519",
+                      "desc": "PQC preferred, classical fallback"},
+    },
 }
 
 # In-memory current mode (also reflected in config). Defaults to fail-closed.
-_CURRENT = {"ssh": "fail-closed", "ipsec": "fail-closed"}
+_CURRENT = {"ssh": "fail-closed", "ipsec": "fail-closed", "tls": "fail-closed"}
+
+# Protocols whose fail mode QUANSEC can actually apply to a live daemon.
+_ENFORCEABLE = {"ipsec", "ssh"}
+
+_TLS_ADVISORY_NOTE = (
+    "Advisory only. QUANSEC cannot enforce TLS 1.3 group selection through "
+    "Python's ssl module, so this records intent rather than changing what the "
+    "TLS service accepts."
+)
 
 
 @router.get("", dependencies=[Depends(require_user)])
 async def get_failmode():
     return {
-        "ssh": {"mode": _CURRENT["ssh"], **MODES["ssh"][_CURRENT["ssh"]]},
-        "ipsec": {"mode": _CURRENT["ipsec"], **MODES["ipsec"][_CURRENT["ipsec"]]},
+        "ssh": {"mode": _CURRENT["ssh"], "enforceable": True,
+                **MODES["ssh"][_CURRENT["ssh"]]},
+        "ipsec": {"mode": _CURRENT["ipsec"], "enforceable": True,
+                  **MODES["ipsec"][_CURRENT["ipsec"]]},
+        "tls": {"mode": _CURRENT["tls"], "enforceable": False,
+                **MODES["tls"][_CURRENT["tls"]], "note": _TLS_ADVISORY_NOTE},
         "recommendation": "fail-closed for maximum quantum safety; fail-open only where uptime outweighs downgrade risk",
     }
 
@@ -64,7 +89,10 @@ async def get_failmode():
 @router.post("/set", dependencies=[Depends(require_admin)])
 async def set_failmode(payload: FailModeSet, conn: asyncpg.Connection = Depends(get_db)):
     if payload.protocol not in MODES:
-        raise HTTPException(status_code=400, detail="protocol must be ipsec or ssh")
+        raise HTTPException(
+            status_code=400,
+            detail=f"protocol must be one of {', '.join(sorted(MODES))}",
+        )
     if payload.mode not in MODES[payload.protocol]:
         raise HTTPException(status_code=400, detail="mode must be fail-closed or fail-open")
 
@@ -76,11 +104,19 @@ async def set_failmode(payload: FailModeSet, conn: asyncpg.Connection = Depends(
         "failmode_set", payload.protocol,
         f'{{"mode":"{payload.mode}"}}', "warning" if payload.mode == "fail-open" else "info",
     )
-    logger.info(f"Fail mode for {payload.protocol} set to {payload.mode}")
+    enforceable = payload.protocol in _ENFORCEABLE
+    logger.info(
+        f"Fail mode for {payload.protocol} set to {payload.mode}"
+        f"{'' if enforceable else ' (advisory only — not enforceable)'}"
+    )
     return {
         "status": "set",
         "protocol": payload.protocol,
         "mode": payload.mode,
         "config": cfg,
-        "note": "Apply via the protocol policy engine to enforce on the live daemon.",
+        "enforceable": enforceable,
+        "note": (
+            "Apply via the protocol policy engine to enforce on the live daemon."
+            if enforceable else _TLS_ADVISORY_NOTE
+        ),
     }

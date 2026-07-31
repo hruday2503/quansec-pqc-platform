@@ -17,10 +17,32 @@ quansec_ca
 quansec_ca.pub
 known_hosts
 
+# ── TLS development PKI ──────────────────────────────────────────────────────
+# scripts/generate_tls_certs.py writes outside the repo by default, but a stray
+# --cert-dir must never leak key material into a commit.
+*.key
+*.csr
+*.srl
+certs/
+quansec/certs/
+
 # ── Node / Next.js ───────────────────────────────────────────────────────────
 node_modules/
 .next/
 out/
+*.tsbuildinfo
+
+# ── Sibling checkouts that live inside this tree ─────────────────────────────
+# Each of these carries its own .git, so `git add -A` would stage them as
+# gitlinks — submodule stubs with no .gitmodules, which clone as empty
+# directories. They are separate repositories and are versioned there.
+quansec-pqc-platform/
+TLS-SMOAD-HSC/
+
+# ── Claude Code local state ──────────────────────────────────────────────────
+# worktrees/ holds live git worktrees; settings.local.json is per-machine.
+.claude/worktrees/
+.claude/settings.local.json
 
 # ── Archives, dumps, logs ────────────────────────────────────────────────────
 *.tar.gz
@@ -36,3 +58,7 @@ out/
 
 # ── OS ───────────────────────────────────────────────────────────────────────
 .DS_Store
+
+# ── PQC TLS runtime (built binaries, logs, PIDs, evidence) ──────────────────
+runtime/
+*.pid

@@ -7,12 +7,16 @@ Lifespan:
 
 Routers mounted:
   /api/ipsec   → protocols/ipsec/router.py  (Phase 1 — DONE)
-  /api/tls     → protocols/tls/router.py    (Phase 2)
-  /api/ssh     → protocols/ssh/router.py    (Phase 3)
+  /api/tls     → protocols/tls/router.py    (Phase 2 — DONE)
+  /api/ssh     → protocols/ssh/router.py    (Phase 3 — DONE)
   /api/vpn     → protocols/vpn/router.py    (Phase 4)
 
 Run with:
   uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+The TLS module needs its transport service running as a SEPARATE process:
+  bash scripts/run_tls_service.sh
+This app is a TLS client only; it never starts or owns that server.
 """
 
 import asyncio
@@ -27,6 +31,9 @@ from core.config import settings
 from core.database import get_pool, close_pool
 from protocols.ipsec.router import router as ipsec_router
 from protocols.ssh.router import router as ssh_router
+from protocols.tls.router import router as tls_router
+from protocols.tls.collector import collect_loop as tls_collect_loop
+from protocols.tls.settings import TlsConfigurationError, get_tls_settings
 from protocols.ssh.ca import router as ssh_ca_router
 from protocols.scoring.router import router as scoring_router
 from protocols.metrics.router import router as metrics_router
@@ -87,8 +94,27 @@ async def lifespan(app: FastAPI):
     _background_tasks.append(ipsec_ev_task)
     logger.info("IPsec lifecycle event listener started")
 
-    # Phase 2–4: uncomment as you add each protocol
-    # tls_task = asyncio.create_task(tls_collect_loop(), name="tls-collector")
+    # TLS — this app is a CLIENT of the TLS transport service, which runs as a
+    # separate process (scripts/run_tls_service.sh). Startup validates the
+    # configuration but never starts that server: a blocking thread-per-client
+    # server does not belong beside an asyncio event loop, and a separate
+    # process releases its listening socket unconditionally on exit.
+    tls_settings = get_tls_settings()
+    if tls_settings.enabled:
+        try:
+            for warning in tls_settings.validate():
+                logger.warning(f"TLS: {warning}")
+            logger.info(f"TLS config: {tls_settings.redacted()}")
+        except TlsConfigurationError as e:
+            # Not fatal: the rest of the platform must keep running, and the TLS
+            # endpoints report the failure themselves.
+            logger.error(f"TLS module misconfigured, endpoints will report 503: {e}")
+        tls_task = asyncio.create_task(tls_collect_loop(), name="tls-collector")
+        _background_tasks.append(tls_task)
+        logger.info("TLS collector started")
+    else:
+        logger.info("TLS module disabled (QUANSEC_TLS_ENABLED=false)")
+
     ssh_task = asyncio.create_task(ssh_collect_loop(), name="ssh-collector")
     alerts_task = asyncio.create_task(alerts_loop(), name="alerts")
     _background_tasks.append(alerts_task)
@@ -134,7 +160,7 @@ app.include_router(ipsec_router)
 app.include_router(ws_router)
 app.include_router(policy_router)
 app.include_router(attacks_router)
-# app.include_router(tls_router)    # Phase 2
+app.include_router(tls_router)
 app.include_router(ssh_router)
 app.include_router(ssh_ca_router)
 app.include_router(scoring_router)
@@ -165,5 +191,5 @@ async def root():
         "service": "QUANSEC",
         "version": "2.0.0",
         "docs": "/docs",
-        "protocols": ["ipsec", "tls (phase 2)", "ssh (phase 3)", "vpn (phase 4)"],
+        "protocols": ["ipsec", "tls", "ssh", "vpn (phase 4)"],
     }

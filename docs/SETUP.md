@@ -9,6 +9,7 @@ session visible in the dashboard.
 - [3. Frontend](#3-frontend)
 - [4. IPsec data plane — StrongSwan with ML-KEM](#4-ipsec-data-plane--strongswan-with-ml-kem)
 - [5. SSH data plane — OpenSSH with PQC key exchange](#5-ssh-data-plane--openssh-with-pqc-key-exchange)
+- [5b. TLS data plane — the QUANSEC TLS service](#5b-tls-data-plane--the-quansec-tls-service)
 - [6. Zero Trust — the certificate authority](#6-zero-trust--the-certificate-authority)
 - [7. Two-VM lab topology](#7-two-vm-lab-topology)
 - [8. Single-host alternative — network namespaces](#8-single-host-alternative--network-namespaces)
@@ -137,7 +138,19 @@ Every variable has a default in `core/config.py`, so the app boots with no `.env
 | `SSH_AUTH_LOG` | `/var/log/auth.log` | |
 | `SSHD_CONFIG` | `/etc/ssh/sshd_config` | Fallback KEX source |
 | `SSH_POLL_INTERVAL` | `5` | Declared in config; the SSH collector uses its own `POLL_INTERVAL = 5` |
-| `NGINX_ACCESS_LOG`, `TLS_POLL_INTERVAL` | | Reserved for the TLS module |
+| `QUANSEC_TLS_ENABLED` | `true` | `false` makes every TLS route return 503 |
+| `QUANSEC_TLS_HOST`, `QUANSEC_TLS_PORT` | `127.0.0.1`, `8443` | Where the backend connects as a TLS client |
+| `QUANSEC_TLS_BIND_HOST` | `127.0.0.1` | Service process only. `0.0.0.0` for two machines |
+| `QUANSEC_TLS_SERVER_HOSTNAME` | `localhost` | Must appear in the server certificate SAN |
+| `QUANSEC_TLS_CERT_DIR` | `~/quansec-certs` | Development PKI. Keep **outside** the repository |
+| `QUANSEC_TLS_MTLS` | `false` | Require a client certificate signed by the same CA |
+| `QUANSEC_TLS_TIMEOUT`, `QUANSEC_TLS_HANDSHAKE_TIMEOUT` | `10`, `5` | Client socket / per-connection handshake cap |
+| `QUANSEC_TLS_REQUIRE_HYBRID` | `false` | Gates startup on a runtime that *has* the hybrid group. Does **not** enforce it |
+| `QUANSEC_TLS_HYBRID_GROUP` | `X25519MLKEM768` | The group requested, never proof it was used |
+| `QUANSEC_TLS_OPENSSL_BIN` | `openssl` | Used for capability probes and group verification |
+| `QUANSEC_TLS_LOG_PAYLOADS` | `false` | Logs message bodies in cleartext. Local debugging only |
+| `QUANSEC_TLS_POLL_INTERVAL` | `30` | Seconds between TLS handshake observations |
+| `NGINX_ACCESS_LOG` | | Reserved for a future collector that tails nginx TLS logs |
 | `WG_INTERFACE`, `VPN_POLL_INTERVAL` | | Reserved for the VPN module |
 
 Read directly from the environment rather than `Settings`:
@@ -526,6 +539,86 @@ WantedBy=multi-user.target
 
 ---
 
+## 5b. TLS data plane — the QUANSEC TLS service
+
+Unlike IPsec and SSH, there is no third-party daemon to install. QUANSEC ships
+its own TLS 1.3 service, runs it as a **separate process**, and connects to it as
+a client. That is what the TLS module measures.
+
+### 5b.1 Generate the development PKI
+
+```bash
+cd quansec
+python scripts/generate_tls_certs.py --cert-dir ~/quansec-certs
+```
+
+Creates a local root CA, a server certificate with `DNS:localhost` and
+`IP:127.0.0.1` in its SAN, and a client certificate for mTLS. Private keys are
+written mode 600.
+
+**This is development material, not production PKI** — the CA private key sits on
+disk beside the server key. Keep the directory outside the repository; the
+repo's `.gitignore` covers `*.key` and `certs/` as a backstop, but the default
+location (`~/quansec-certs`) is outside the tree on purpose.
+
+There is no HTTP route for this. Generating a CA rotates the trust anchor for the
+whole module, so it requires shell access by design.
+
+### 5b.2 Run the service
+
+```bash
+bash scripts/run_tls_service.sh            # foreground, own terminal
+```
+
+It listens on `127.0.0.1:8443`, enforces TLS 1.3 only, and verifies client
+certificates when `QUANSEC_TLS_MTLS=true`. The backend never starts it: a
+blocking thread-per-client server does not belong beside an asyncio event loop,
+and a separate process releases its listening socket unconditionally on exit.
+
+### 5b.3 Verify with an independent tool
+
+```bash
+openssl s_client -connect 127.0.0.1:8443 -tls1_3 \
+        -CAfile ~/quansec-certs/ca.crt -servername localhost -brief </dev/null
+```
+
+Expected on stock Ubuntu 24.04:
+
+```
+Protocol version: TLSv1.3
+Ciphersuite: TLS_AES_256_GCM_SHA384
+Verification: OK
+Server Temp Key: X25519, 253 bits      ← classical
+```
+
+That last line is correct and expected: **Ubuntu 24.04 ships OpenSSL 3.0.13,
+which has no `X25519MLKEM768`.** The hybrid group needs OpenSSL 3.5.5+. The
+portal reports this as `hybrid.availability: unavailable` rather than implying
+otherwise.
+
+To reach hybrid on this machine you need a Python linked against a newer
+OpenSSL — see `scripts/provision-openssl35.sh`, which is **optional** and not
+required for anything else in the platform to work. Even then, hybrid would be
+*available*, not *enforced*: Python's `ssl` module cannot select TLS 1.3 groups,
+so a classical-only client still connects.
+
+### 5b.4 Two machines
+
+The same PKI and the same code work across two hosts:
+
+```bash
+# Peer machine: regenerate the server cert so its SAN covers the peer address
+python scripts/generate_tls_certs.py --extra-ip 192.168.1.50 --force
+QUANSEC_TLS_BIND_HOST=0.0.0.0 bash scripts/run_tls_service.sh
+
+# QUANSEC machine
+QUANSEC_TLS_HOST=192.168.1.50
+```
+
+Nothing else changes.
+
+---
+
 ## 6. Zero Trust — the certificate authority
 
 The SSH module replaces "a public key in `authorized_keys` forever" with
@@ -776,6 +869,18 @@ curl -s localhost:8000/api/ipsec/tunnels -H "Authorization: Bearer $TOKEN"
 # ── SSH ────────────────────────────────────────────────────────────────────
 curl -s localhost:8000/api/ssh/stats -H "Authorization: Bearer $TOKEN"
 # kex_algorithm mlkem768x25519-sha256, kem_label ML-KEM-768
+
+# ── TLS ────────────────────────────────────────────────────────────────────
+# Ground truth first — an independent tool, not our own code
+openssl s_client -connect 127.0.0.1:8443 -tls1_3 \
+        -CAfile ~/quansec-certs/ca.crt -servername localhost -brief </dev/null
+# expect: TLSv1.3, TLS_AES_256_GCM_SHA384, Verification: OK
+
+curl -s localhost:8000/api/tls/status -H "Authorization: Bearer $TOKEN"
+# service.reachable true; hybrid.availability "unavailable" on OpenSSL 3.0.13,
+# hybrid.enforcement always "not_enabled"
+curl -s -X POST localhost:8000/api/tls/test-connection -H "Authorization: Bearer $TOKEN"
+# tls_version TLSv1.3, cert_verified true, negotiated_group null (expected)
 
 # ── Zero Trust ─────────────────────────────────────────────────────────────
 curl -s localhost:8000/api/ssh/zt/status -H "Authorization: Bearer $TOKEN"

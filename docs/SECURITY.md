@@ -388,6 +388,41 @@ location /metrics {
 
 ---
 
+### 6.5 The TLS transport service
+
+QUANSEC runs its own TLS 1.3 service on port 8443 and connects to it as a client.
+Its security properties, and their limits:
+
+**What genuinely holds.** TLS 1.3 is pinned as both the minimum and maximum
+version, so a TLS 1.2 client is rejected at the handshake. Clients verify the
+server certificate chain and hostname (`CERT_REQUIRED` plus `check_hostname`).
+With `QUANSEC_TLS_MTLS=true` the server requires a client certificate signed by
+the configured CA, and rejects a client that presents none. All four are covered
+by tests that connect over a real socket.
+
+**What does not hold, and cannot in this architecture.** Hybrid key exchange is
+**not enforced**: Python's `ssl` module exposes no TLS 1.3 group-selection API,
+so a client offering only classical X25519 completes a handshake, and a client
+offering only AES-128-GCM is accepted. This is a property of the language
+binding, not a configuration mistake. The platform reports it as
+`enforcement: not_enabled` with a machine-readable reason rather than hiding it.
+
+**Denial of service.** Each accepted socket gets a handshake timeout before TLS
+wrapping, and handshakes run in a bounded worker pool, so a client that opens TCP
+and sends nothing cannot stall other handshakes. Beyond that the service is a
+thread-per-connection design and is not intended for internet exposure.
+
+**Payload confidentiality in logs.** Application payloads are redacted by default
+and only logged when `QUANSEC_TLS_LOG_PAYLOADS=true`. The API never echoes a sent
+payload back — `echo_received` reports only that the service answered — so a
+response cannot leak what was sent.
+
+**Certificate generation is not an HTTP operation.** It rotates the trust anchor
+for the whole module, so it lives in `scripts/generate_tls_certs.py` and requires
+shell access. There is no route for it at any privilege level.
+
+---
+
 ## 7. Audit
 
 `audit_events` records privileged actions with actor, action, resource, detail and
@@ -500,6 +535,10 @@ Ordered by severity.
 | 14 | Cert serial allocation races | Duplicate serials break revocation by serial | Use a sequence |
 | 15 | `StrictHostKeyChecking=no` in the ZT remote fetch | MITM on the audit channel | Pin the host key |
 | 16 | WebSocket cleanup references possibly-unbound names | `NameError`/`ValueError` in the error path | Initialise before the `try` |
+| 17 | **TLS hybrid key exchange is not enforced** | A classical X25519-only client completes a handshake against the TLS service, so the post-quantum property is optional in practice | Not fixable in Python — needs OpenSSL `SSL_CONF`, native bindings, or a terminating proxy with a strict group policy. Reported as `enforcement: not_enabled` everywhere |
+| 18 | TLS cipher suite is not enforced either | An AES-128-GCM-only client is accepted where AES-256-GCM was intended | Same root cause and same fix as #17 |
+| 19 | TLS development PKI keeps the CA key on disk | Anyone who can read it can mint certificates the TLS service trusts | Mode 600 at creation and stored outside the repo; production needs an HSM/KMS-held CA |
+| 20 | `tls_sessions` has no retention policy | Unbounded growth, ~2 900 rows/day at the default poll interval | Add a retention window before a long-running deployment |
 
 ---
 
@@ -518,6 +557,9 @@ Ordered by severity.
 - [ ] Backend runs as a dedicated non-root service account
 - [ ] `sudoers` entries scoped to exact commands with fixed paths
 - [ ] CA private key passphrase-protected or moved to an HSM
+- [ ] `QUANSEC_TLS_LOG_PAYLOADS` confirmed `false` — it logs message bodies in cleartext
+- [ ] TLS development PKI regenerated outside the repository, keys mode 600, and **not** reused as production PKI
+- [ ] TLS hybrid status understood as *observational*: a `negotiated_verified` badge is not an enforcement guarantee (see risk #17)
 - [ ] API keys created under operator accounts, never admin
 - [ ] WebSocket authentication implemented, or the port firewalled
 

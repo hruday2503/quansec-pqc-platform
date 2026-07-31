@@ -3,12 +3,9 @@
 import { useEffect, useState } from "react";
 import { Panel, PanelHeader } from "@/components/ui-primitives";
 import { ShieldCheck, ShieldX, KeyRound, Clock, UserCheck, Ban, Fingerprint } from "lucide-react";
+import { authHeaders } from "@/lib/auth-fetch";
 
 const API_BASE = process.env.NEXT_PUBLIC_QUANSEC_API || "http://localhost:8000";
-function authHeaders(): HeadersInit {
-  const token = typeof window !== "undefined" ? localStorage.getItem("quansec_token") : null;
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
 
 interface ZtEvent {
   event_time: string; identity: string; cert_serial: string; ca_fingerprint: string;

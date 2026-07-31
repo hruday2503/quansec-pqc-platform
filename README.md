@@ -5,7 +5,7 @@
 **Post-Quantum Cryptography Management Platform**
 
 Real-time discovery, enforcement, scoring and audit of post-quantum key exchange
-across IPsec, SSH and (planned) TLS.
+across IPsec, SSH and TLS.
 
 `FastAPI` · `PostgreSQL` · `Redis` · `Next.js 16` · `StrongSwan + ML-KEM` · `OpenSSH PQC`
 
@@ -45,7 +45,7 @@ against a simulation:
 Everything is exposed through a REST + WebSocket API, a Prometheus `/metrics`
 endpoint, a SIEM export (CEF / syslog / JSON), and two Next.js operator portals.
 
-**Version:** 2.0.0 · **Protocols live:** IPsec, SSH · **Planned:** TLS, VPN
+**Version:** 2.0.0 · **Protocols live:** IPsec, SSH, TLS · **Planned:** VPN
 
 ---
 
@@ -90,6 +90,7 @@ cryptographic daemon during a request.** Collectors own that boundary.
 │   /                landing — protocol picker                              │
 │   /ipsec/login  → /portal/*        IPsec operator portal                  │
 │   /ssh/login    → /ssh-portal/*    SSH operator portal                    │
+│   /tls/login    → /tls-portal/*    TLS operator portal                    │
 │                                                                           │
 │   5 s REST polling  +  WebSocket push on lifecycle events                 │
 └───────────────────────────────┬───────────────────────────────────────────┘
@@ -102,14 +103,16 @@ cryptographic daemon during a request.** Collectors own that boundary.
 │  │ database asyncpg pool    │  │           attacks, websocket, router │   │
 │  │ auth     JWT + API keys  │  │ ssh/      collector, policy, ca,     │   │
 │  │ redis_client  pub/sub    │  │           ztaudit, router            │   │
-│  └──────────────────────────┘  │ tls/      (planned — empty package)  │   │
+│  └──────────────────────────┘  │ tls/      transport service, adapter,│   │
+│                                │           hybrid probe, collector    │   │
 │                                │ scoring/  readiness model            │   │
 │  ┌─── background tasks ─────┐  │ alerts/   rule engine                │   │
 │  │ ipsec-collector    5 s   │  │ siem/     CEF · syslog · JSON        │   │
 │  │ ipsec-events    (push)   │  │ metrics/  Prometheus /metrics        │   │
 │  │ ssh-collector      5 s   │  │ failmode/ fail-closed / fail-open    │   │
-│  │ alerts            10 s   │  │ auth_*    login, RBAC, API keys      │   │
-│  │ zt-audit           8 s   │  └──────────────────────────────────────┘   │
+│  │ tls-collector     30 s   │  │ auth_*    login, RBAC, API keys      │   │
+│  │ alerts            10 s   │  └──────────────────────────────────────┘   │
+│  │ zt-audit           8 s   │                                             │
 │  └──────────────────────────┘                                             │
 └───────────┬───────────────────────────────────────────┬───────────────────┘
             │                                           │
@@ -123,6 +126,11 @@ cryptographic daemon during a request.** Collectors own that boundary.
                                              │  OpenSSH PQC :2222          │
                                              │   └ mlkem768x25519-sha256   │
                                              │   └ CA-signed certs only    │
+                                             │                             │
+                                             │  QUANSEC TLS service :8443  │
+                                             │   └ separate process        │
+                                             │   └ TLS 1.3 only, mTLS      │
+                                             │   └ hybrid NOT enforced     │
                                              └─────────────────────────────┘
 ```
 
@@ -149,6 +157,11 @@ alerts), which is the whole point of the modular design: **every protocol
 implements the same contract**, so the API surface, the scoring model, the alert
 rules and the UI patterns are reused verbatim.
 
+TLS follows the same contract with one difference in where the telemetry comes
+from: instead of reading a daemon's state, the collector performs a real TLS 1.3
+handshake against QUANSEC's own TLS service and records what the socket
+reported.
+
 Full detail: **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**
 
 ---
@@ -169,13 +182,13 @@ quansec-pqc-platform/
 │   └── protocols/
 │       ├── IPSEC.md               IPsec module, deep
 │       ├── SSH.md                 SSH module, deep
-│       └── TLS.md                 TLS module design (not yet implemented)
+│       └── TLS.md                 TLS module, deep
 │
 ├── quansec/                   ← backend (FastAPI). Run uvicorn from HERE.
 │   ├── main.py                    app factory, lifespan, router mounting
 │   ├── core/                      config · database · auth · redis_client
 │   ├── protocols/                 one package per protocol + cross-cutting
-│   ├── migrations/                001…006 SQL, applied on startup
+│   ├── migrations/                001…007 SQL, applied on startup
 │   ├── strongswan/                swanctl.conf templates
 │   ├── strongswan-configs/        ml-kem.conf · liboqs.conf · private-algs.conf
 │   ├── compiled-backup/           ML-KEM StrongSwan plugin source + build
@@ -189,6 +202,7 @@ quansec-pqc-platform/
 │   └── src/
 │       ├── app/portal/*           IPsec portal pages
 │       ├── app/ssh-portal/*       SSH portal pages
+│       ├── app/tls-portal/*       TLS portal pages
 │       ├── lib/api.ts             typed API client + token handling
 │       └── components/            sidebar, UI primitives
 │
@@ -207,7 +221,7 @@ existing module changes.
 |---|---|---|---|
 | **IPsec** | `protocols/ipsec/` | VICI polling, SA normalisation, lifecycle events, swanctl policy, attack lab | `ipsec-collector` (5 s), `ipsec-events` (push) |
 | **SSH** | `protocols/ssh/` | Session discovery, KEX classification, sshd policy, certificate authority, Zero Trust audit | `ssh-collector` (5 s), `zt-audit` (8 s) |
-| **TLS** | `protocols/tls/` | *Planned* — empty package, router commented out in `main.py` | — |
+| **TLS** | `protocols/tls/` | Real TLS 1.3 transport service, handshake observation, certificate inventory, evidence-based hybrid status | `tls-collector` (30 s) |
 | **Scoring** | `protocols/scoring/` | Weighted 0–100 readiness score, A–F grade, per protocol and overall | — |
 | **Alerts** | `protocols/alerts/` | Rule evaluation against live state, deduplicated firings, acknowledgement | `alerts` (10 s) |
 | **SIEM** | `protocols/siem/` | Export in CEF, RFC 5424 syslog, and JSON | — |
@@ -324,24 +338,45 @@ is in **[docs/TECHNOLOGY-CHOICES.md](docs/TECHNOLOGY-CHOICES.md)**.
 
 | | IPsec | SSH | TLS |
 |---|---|---|---|
-| **Status** | Live | Live | Planned — not implemented |
-| **Daemon** | StrongSwan `charon` | OpenSSH PQC `/opt/openssh-pqc` :2222 | nginx / OpenSSL 3.5+ |
-| **KEM** | ML-KEM-1024 (pure) | ML-KEM-768 + X25519 (hybrid) | ML-KEM-768 + X25519 (hybrid) |
-| **NIST level** | Level 5 (FIPS 203) | Level 3 (FIPS 203) | Level 3 |
+| **Status** | Live | Live | Live — transport real, hybrid **not enforced** |
+| **Daemon** | StrongSwan `charon` | OpenSSH PQC `/opt/openssh-pqc` :2222 | QUANSEC TLS service :8443 (separate process) |
+| **KEM** | ML-KEM-1024 (pure) | ML-KEM-768 + X25519 (hybrid) | X25519MLKEM768 requested, not enforced |
+| **NIST level** | Level 5 (FIPS 203) | Level 3 (FIPS 203) | Level 3 (where the runtime provides it) |
 | **CNSA 2.0 deadline** | 2033 | 2030 | 2030 |
-| **Telemetry source** | VICI unix socket (poll + event subscription) | `ss -tnp` + journald `kex: algorithm:` lines | TLS handshake logs / OpenSSL callback |
-| **Policy target** | `/etc/swanctl/swanctl.conf` + `swanctl --load-all` | `/opt/openssh-pqc/etc/sshd_config` + daemon restart | `nginx.conf` `ssl_ecdh_curve` + reload |
-| **Extras** | Attack lab, lifecycle event stream | Certificate authority, Zero Trust audit | Certificate inventory (planned) |
+| **Telemetry source** | VICI unix socket (poll + event subscription) | `ss -tnp` + journald `kex: algorithm:` lines | Real TLS 1.3 handshakes performed by the backend |
+| **Policy target** | `/etc/swanctl/swanctl.conf` + `swanctl --load-all` | `/opt/openssh-pqc/etc/sshd_config` + daemon restart | *None* — Python `ssl` cannot select TLS 1.3 groups |
+| **Extras** | Attack lab, lifecycle event stream | Certificate authority, Zero Trust audit | Certificate inventory, out-of-band group verification |
 | **Deep doc** | [docs/protocols/IPSEC.md](docs/protocols/IPSEC.md) | [docs/protocols/SSH.md](docs/protocols/SSH.md) | [docs/protocols/TLS.md](docs/protocols/TLS.md) |
 
-**On TLS:** `protocols/tls/` contains only an empty `__init__.py`, and the TLS
-router is commented out in `main.py`. `docs/protocols/TLS.md` documents the
-design that follows from the existing module contract — collector, policy
-engine, schema, endpoints — so the module can be built without redesign. It is
-labelled as a specification throughout, not as shipped functionality. The
-platform *does* already carry TLS placeholders in the fail-mode and scoring seed
-data (`fail_mode_policies`, `pqc_scores`), which is why TLS rows appear in the
-database with a grade of F.
+**On TLS — read this before quoting a coverage figure.** The transport is real:
+TLS 1.3 is enforced, certificate chains and hostnames are verified, mutual TLS
+works, and every recorded value is read off a live socket. Post-quantum key
+exchange is a separate question, and the module is built so it cannot be
+overstated:
+
+- **Hybrid is not enforced.** A client offering only classical X25519 completes a
+  handshake against the service. Python's `ssl` module exposes no TLS 1.3
+  group-selection API, so this is not fixable in Python — it needs OpenSSL
+  `SSL_CONF`, native bindings, or a terminating proxy with a strict policy.
+- **The negotiated group is not observable from Python.** It is reported as
+  `null` alongside a `negotiated_group_source` explaining why. Establishing it
+  requires `openssl s_client` or a packet capture, and that evidence is stored
+  with a timestamp.
+- **On stock Ubuntu 24.04 hybrid is unavailable outright** — OpenSSL 3.0.13 has
+  no `X25519MLKEM768`. The portal reports `unavailable` rather than implying
+  otherwise, and a test asserts that a newer OpenSSL version *on its own* never
+  promotes the status.
+
+`tls_sessions.pqc_enabled` is written `TRUE` only when verified evidence covers
+that exact endpoint and group, so the seeded grade-F `tls` row in `pqc_scores` is
+now backed by a measurement — one that currently scores low, accurately.
+
+The TLS service runs as its **own process**; the backend never starts it:
+
+```bash
+bash scripts/run_tls_service.sh          # terminal 1 — TLS service on :8443
+uvicorn main:app --port 8000             # terminal 2 — backend, a TLS client
+```
 
 ---
 
@@ -358,6 +393,7 @@ database with a grade of F.
 | **[OPERATIONS.md](docs/OPERATIONS.md)** | Run it — health checks, Prometheus, SIEM, alert tuning, and a troubleshooting matrix |
 | **[protocols/IPSEC.md](docs/protocols/IPSEC.md)** | Work on IPsec — VICI, SA normalisation, the ML-KEM plugin, policy switching, attack lab |
 | **[protocols/SSH.md](docs/protocols/SSH.md)** | Work on SSH — KEX detection, the certificate authority, Zero Trust audit, policy rollback |
+| **[protocols/TLS.md](docs/protocols/TLS.md)** | Work on TLS — the transport service, the hybrid status model, and exactly which post-quantum claims the platform may make |
 | **[protocols/TLS.md](docs/protocols/TLS.md)** | Build the TLS module against the existing contract |
 
 ---
@@ -379,7 +415,8 @@ useful.
 
 | Area | Detail |
 |---|---|
-| **TLS module** | Not implemented. Package is empty; router commented out in `main.py`. Design in [docs/protocols/TLS.md](docs/protocols/TLS.md). |
+| **TLS hybrid enforcement** | The TLS transport is real, but hybrid key exchange is **not enforced** and the negotiated group is not observable from Python. On stock Ubuntu 24.04 (OpenSSL 3.0.13) the hybrid group does not exist at all. Reported honestly per-state; see [docs/protocols/TLS.md](docs/protocols/TLS.md) §11. |
+| **TLS retention** | `tls_sessions` grows unbounded — roughly 2 900 rows/day at the default 30 s poll. Needs a retention or rollup policy before a long-running deployment. |
 | **VPN module** | Not implemented. `protocols/vpn/` is an empty package; config keys (`WG_INTERFACE`) exist but nothing reads them. |
 | **SIEM audit source** | `protocols/siem/router.py` selects `audit_events.created_at`, but migration 001 defines that column as `occurred_at`. The query is wrapped in `try/except` and logs at DEBUG, so SIEM exports currently return Zero Trust events only and silently omit audit events. |
 | **Duplicate table definitions** | Several modules `CREATE TABLE IF NOT EXISTS` at runtime with schemas that differ from the migrations: runtime `zt_audit` vs migration `zt_ssh_audit`; runtime `alerts` vs migration `alert_rules`/`alert_firings`. The runtime tables are the ones actually used. See [DATA-MODEL.md](docs/DATA-MODEL.md#runtime-created-tables). |

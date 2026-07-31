@@ -46,6 +46,7 @@ RULES = [
     {"id": "downgrade_detected", "severity": "critical", "desc": "A classical/downgraded connection was observed"},
     {"id": "zt_rejection", "severity": "medium", "desc": "A Zero Trust certificate auth was rejected"},
     {"id": "tunnel_down", "severity": "high", "desc": "An IPsec tunnel went DOWN"},
+    {"id": "tls_service_down", "severity": "high", "desc": "The TLS transport service is unreachable"},
 ]
 
 
@@ -77,6 +78,45 @@ async def evaluate_once(pool: asyncpg.Pool):
                 await _raise(conn, "downgrade_detected", "critical", "ssh",
                              f"SSH session using classical KEX: {r['kex_algorithm']} ({r['remote_host']})",
                              f"ssh-downgrade-{r['remote_host']}-{r['kex_algorithm']}")
+
+        # Rule: TLS service availability and hybrid posture.
+        #
+        # Unlike IPsec and SSH, this does NOT alert per classical handshake. On a
+        # runtime where the hybrid group does not exist every handshake is
+        # classical, and per-session alerts would be constant noise that trains
+        # operators to ignore the list. Alert instead on things that can change:
+        # the service going away, and coverage regressing after hybrid has
+        # actually been verified to work here.
+        try:
+            exists = await conn.fetchval(
+                "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name='tls_sessions')"
+            )
+            if exists:
+                recent = await conn.fetch(
+                    "SELECT outcome, pqc_enabled FROM tls_sessions ORDER BY observed_at DESC LIMIT 5"
+                )
+                if recent and all(r["outcome"] != "success" for r in recent):
+                    outcome = recent[0]["outcome"]
+                    await _raise(conn, "tls_service_down", "high", "tls",
+                                 f"TLS transport service unreachable: last {len(recent)} "
+                                 f"observations failed ({outcome})",
+                                 f"tls-down-{outcome}")
+
+                hybrid_ever_verified = await conn.fetchval(
+                    "SELECT EXISTS (SELECT 1 FROM tls_hybrid_evidence WHERE verified = TRUE)"
+                )
+                successful = [r for r in recent if r["outcome"] == "success"]
+                if hybrid_ever_verified and successful:
+                    classical = sum(1 for r in successful if not r["pqc_enabled"])
+                    if classical:
+                        await _raise(
+                            conn, "pqc_coverage_drop", "high", "tls",
+                            f"TLS hybrid was verified previously, but {classical} of the "
+                            f"last {len(successful)} handshakes are not covered by evidence",
+                            "tls-coverage-drop",
+                        )
+        except Exception as e:
+            logger.debug(f"tls alert rule: {e}")
 
         # Rule: Zero Trust rejections
         try:

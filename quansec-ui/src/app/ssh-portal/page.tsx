@@ -3,13 +3,9 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Terminal, ArrowRight, Wifi, WifiOff, ShieldCheck } from "lucide-react";
+import { authHeaders } from "@/lib/auth-fetch";
 
 const API_BASE = process.env.NEXT_PUBLIC_QUANSEC_API || "http://localhost:8000";
-
-function authHeaders(): HeadersInit {
-  const token = typeof window !== "undefined" ? localStorage.getItem("quansec_token") : null;
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
 
 export default function SshPortalOverview() {
   const [stats, setStats] = useState<{ active: number; pqc_enabled: number; pqc_coverage: number } | null>(null);

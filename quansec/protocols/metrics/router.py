@@ -64,6 +64,47 @@ async def prometheus_metrics(conn: asyncpg.Connection = Depends(get_db)):
     except Exception as e:
         logger.debug(f"ssh metrics: {e}")
 
+    # TLS metrics
+    #
+    # quansec_tls_handshakes_pqc counts only observations backed by verified
+    # hybrid evidence. On a runtime without X25519MLKEM768 it is legitimately
+    # zero, and a dashboard showing zero reports a fact rather than missing data.
+    try:
+        tls = await conn.fetch(
+            "SELECT outcome, pqc_enabled, tls_version, handshake_ms FROM tls_sessions"
+        )
+        tls_total = len(tls)
+        tls_ok = sum(1 for r in tls if r["outcome"] == "success")
+        tls_pqc = sum(1 for r in tls if r["pqc_enabled"])
+        tls_13 = sum(1 for r in tls if r["tls_version"] == "TLSv1.3")
+        latencies = sorted(r["handshake_ms"] for r in tls if r["handshake_ms"] is not None)
+
+        metric("quansec_tls_handshakes_total", tls_total, "TLS handshake observations", "counter")
+        metric("quansec_tls_handshakes_successful", tls_ok, "Successful TLS handshakes", "counter")
+        metric("quansec_tls_handshakes_failed", tls_total - tls_ok, "Failed TLS handshakes", "counter")
+        metric("quansec_tls_handshakes_pqc", tls_pqc,
+               "TLS handshakes with verified hybrid PQC evidence", "counter")
+        metric("quansec_tls_pqc_coverage_percent",
+               round((tls_pqc / tls_ok * 100) if tls_ok else 0, 1), "TLS PQC coverage %")
+        metric("quansec_tls13_handshakes", tls_13, "Handshakes negotiating TLS 1.3", "counter")
+        if latencies:
+            metric("quansec_tls_handshake_duration_ms",
+                   round(latencies[len(latencies) // 2], 2),
+                   "Median TLS handshake duration in milliseconds")
+
+        evidence = await conn.fetchval(
+            "SELECT COUNT(*) FROM tls_hybrid_evidence WHERE verified = TRUE"
+        )
+        metric("quansec_tls_hybrid_verifications_total", evidence or 0,
+               "Successful out-of-band hybrid group verifications", "counter")
+        # Exported as a constant 0 so an operator can alert on it ever flipping,
+        # rather than having to read a document to learn enforcement is absent.
+        metric("quansec_tls_hybrid_enforced", 0,
+               "1 if hybrid key exchange is enforced; always 0 while Python ssl "
+               "cannot select TLS 1.3 groups")
+    except Exception as e:
+        logger.debug(f"tls metrics: {e}")
+
     # Zero Trust metrics
     try:
         exists = await conn.fetchval("SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name='zt_audit')")

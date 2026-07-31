@@ -224,6 +224,58 @@ runtime-created `issued_certs` and `zt_audit` (§7). See the divergence note bel
 
 ---
 
+## 5b. TLS tables
+
+Created by `migrations/007_tls.sql`, written by `protocols/tls/collector.py`
+(every 30 s) and by `POST /api/tls/test-connection`.
+
+### `tls_sessions`
+
+One row per **observed handshake**, successful or failed. Not aggregated into
+per-minute buckets like a public-traffic collector would need: this module
+observes a service QUANSEC runs and polls, which is a bounded low-rate stream.
+
+| Column | Type | Notes |
+|---|---|---|
+| `server_host` / `server_port` | `TEXT` / `INT` | The endpoint that was probed |
+| `tls_version` | `TEXT` | `TLSv1.3` — the service refuses anything else |
+| `cipher_suite` / `cipher_bits` | `TEXT` / `INT` | Read off the live socket |
+| `named_group` | `TEXT` | **Always `NULL`** — Python's `ssl` cannot report it |
+| `group_source` | `TEXT` | `unavailable-python-ssl`, so a `NULL` above is never misread as "no group was used" |
+| `pqc_enabled` | `BOOLEAN` | `TRUE` **only** when a verified `tls_hybrid_evidence` row covers this host, port and group |
+| `cert_verified` | `BOOLEAN` | Chain and hostname, verified by OpenSSL during the handshake |
+| `handshake_ms` | `FLOAT` | TCP connect plus TLS handshake |
+| `outcome` | `TEXT` | `CHECK IN ('success','handshake_failed','cert_failed','timeout','unreachable','config_error')` |
+| `source` | `TEXT` | `CHECK IN ('collector','api')` |
+
+Failures are recorded, not dropped. An operator needs to see that the service was
+unreachable at 14:03 as much as they need the successful handshakes.
+
+### `tls_hybrid_evidence`
+
+The **only** thing that can promote hybrid status to "negotiated and verified".
+Written by `POST /api/tls/hybrid/verify` (admin), which runs
+`openssl s_client -groups <group> -brief` against the TLS service and stores the
+line it printed.
+
+| Column | Notes |
+|---|---|
+| `requested_group` / `negotiated_group` | What was asked for, and what OpenSSL said it got |
+| `verified` | `TRUE` only when the two match and the command succeeded |
+| `evidence_line` | The captured `Negotiated TLS1.3 group: ...` line, kept as audit evidence |
+
+Evidence is **endpoint-scoped**: a verified row for one port or one group does not
+apply to another. This is what stops one successful check from making every later
+handshake look post-quantum.
+
+### `tls_certificates`
+
+Certificate inventory, upserted on `(server_name, serial_number)` by
+`GET /api/tls/certificate`. `pqc_signature` comes from an OID lookup, not an
+assumption, so it starts reporting `TRUE` the day ML-DSA certificates appear.
+
+---
+
 ## 6. Cross-cutting tables
 
 ### `siem_events`
@@ -243,12 +295,21 @@ rather than reading history. Populating it is what would enable trend charts.
 
 Seeded with one row per protocol (`ipsec`, `ssh`, `tls`, `vpn`) at score 0.0,
 grade F, risk `critical`. The scoring API computes live and does **not** write
-back, so these rows remain at their seeded values. **This is why `tls` and `vpn`
-show grade F** — a placeholder, not a measurement.
+back, so these rows remain at their seeded values. **This is why `vpn` shows
+grade F** — a placeholder, not a measurement.
+
+`tls` is no longer a placeholder: `GET /api/scoring/tls` computes from
+`tls_sessions`, which the TLS collector fills with real handshake observations.
+The score is currently low, but it is earned rather than seeded — see
+[protocols/TLS.md](protocols/TLS.md#9-cross-cutting-integration) for why
+`downgrade_resistant` is fixed at `False`.
 
 ### `fail_mode_policies`
 
 Seeded with sensible defaults (IPsec/SSH/TLS `fail-secure`, VPN `fail-open`).
+The `tls` entry is **advisory only** — QUANSEC cannot enforce TLS 1.3 group
+selection through Python's `ssl` module, so setting it records intent rather
+than changing what the TLS service accepts.
 **Not read.** `protocols/failmode/router.py` keeps state in an in-memory
 `_CURRENT` dict that resets on restart. Wiring the endpoint to this table is a
 small, worthwhile change.
@@ -371,6 +432,8 @@ makes its writer idempotent. **They are load-bearing.**
 | `zt_audit` | One row per certificate auth | ❌ |
 | `audit_events` | One row per privileged action | ❌ |
 | `alerts` | Deduplicated by fingerprint | ✅ in practice |
+| `tls_sessions` | One row per observed handshake, forever | ❌ |
+| `tls_hybrid_evidence` | One row per verification run | ✅ in practice |
 
 **No retention policy exists for anything.**
 
@@ -380,6 +443,9 @@ The two that will grow fastest:
   tunnel. Modest, until you have hundreds of tunnels.
 - **`ssh_connections`** — every SSH session ever seen keeps a `CLOSED` row.
   A CI system opening connections in a loop will fill this table.
+- **`tls_sessions`** — the collector polls every 30 s by default, so roughly
+  2 900 rows a day even when nothing changes. This is the fastest-growing table
+  in the schema and needs a retention policy before any long-running deployment.
 
 Suggested retention, once the platform runs continuously:
 
@@ -388,6 +454,7 @@ Suggested retention, once the platform runs continuously:
 DELETE FROM ipsec_events WHERE occurred_at < NOW() - INTERVAL '90 days';
 DELETE FROM zt_audit     WHERE event_time  < NOW() - INTERVAL '90 days';
 DELETE FROM audit_events WHERE occurred_at < NOW() - INTERVAL '90 days';
+DELETE FROM tls_sessions WHERE observed_at < NOW() - INTERVAL '30 days';
 
 -- keep 30 days of closed sessions
 DELETE FROM ssh_connections
