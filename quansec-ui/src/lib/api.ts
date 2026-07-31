@@ -358,23 +358,66 @@ export interface TlsDowngradeTest {
 export interface ApiKey {
   id: number;
   name: string;
+  /** Already masked by the backend. The hash is never returned. */
   key_prefix: string;
   scopes: string[];
+  protocol: string | null;
   last_used: string | null;
   created_at: string;
+  /** Null only for a non-expiring key, which requires system:admin to issue. */
+  expires_at: string | null;
   revoked: boolean;
+  expired: boolean;
+}
+
+/** Revoked and expired are different terminal states and are shown as such. */
+export type ApiKeyState = "active" | "expired" | "revoked";
+
+export function apiKeyState(key: ApiKey): ApiKeyState {
+  if (key.revoked) return "revoked";
+  if (key.expired) return "expired";
+  return "active";
 }
 
 export interface ApiKeyCreated {
   id: number;
   name: string;
-  /** Returned once and never again. */
+  /** Returned once and never again. Only its SHA-256 hash is stored. */
   api_key: string;
   key_prefix: string;
   scopes: string[];
+  protocol: string | null;
   created_at: string;
+  expires_at: string | null;
   warning: string;
 }
+
+/** GET /api/keys/scopes — exactly what the caller may put on a key. */
+export interface GrantableScopes {
+  grantable: string[];
+  descriptions: Record<string, string>;
+}
+
+/** The only scopes the TLS portal offers. Server-side the request is still
+ *  intersected with the caller's own authority, so this list is convenience,
+ *  never the control. */
+export const TLS_KEY_SCOPES = [
+  {
+    scope: "tls:read",
+    label: "Read",
+    detail: "Status, stats, sessions, events, policy and readiness.",
+  },
+  {
+    scope: "tls:probe",
+    label: "Probe",
+    detail: "Run enforcement probes and validation tests. Implies read. Cannot change policy.",
+  },
+  {
+    scope: "tls:admin",
+    label: "Admin",
+    detail: "Apply and roll back policy, control the data plane. Implies read and probe.",
+  },
+] as const;
 
 class QuansecClient {
   /** In memory only. Never persisted. */
@@ -749,6 +792,56 @@ class QuansecClient {
     return this.request<{ status: string; key_id: number }>(`/api/keys/${id}`, {
       method: "DELETE",
     });
+  }
+
+  // ── TLS-scoped API keys ────────────────────────────────────────────────
+  //
+  // Thin wrappers over the same /api/keys routes, pinned to protocol=tls.
+  // There is no separate TLS key store: a key is one row in api_keys, and
+  // `protocol` records which portal issued it. Enforcement is always by
+  // scope, never by protocol — a tls-labelled key holding only ssh:read
+  // still cannot read TLS endpoints.
+
+  /**
+   * Create a TLS API key. The raw value comes back ONCE.
+   *
+   * `expiresInDays` omitted uses the backend's 90-day default. Passing
+   * `neverExpires` requires system:admin and is rejected with 403 otherwise —
+   * the UI offers it only to those who hold it, but the server is the check.
+   */
+  async createTlsApiKey(
+    name: string,
+    scopes: string[],
+    opts: { expiresInDays?: number; neverExpires?: boolean } = {}
+  ) {
+    return this.request<ApiKeyCreated>("/api/keys", {
+      method: "POST",
+      body: JSON.stringify({
+        name,
+        scopes,
+        protocol: "tls",
+        expires_in_days: opts.expiresInDays ?? null,
+        never_expires: opts.neverExpires ?? false,
+      }),
+    });
+  }
+
+  /** TLS keys only, masked. Includes revoked and expired so the page can
+   *  show terminal states rather than silently dropping them. */
+  async listTlsApiKeys() {
+    return this.request<ApiKey[]>("/api/keys?protocol=tls&include_revoked=true");
+  }
+
+  async revokeTlsApiKey(id: number) {
+    return this.request<{ status: string; key_id: number }>(`/api/keys/${id}`, {
+      method: "DELETE",
+    });
+  }
+
+  /** Which scopes the caller may actually grant. The page uses this to
+   *  disable options rather than letting the user hit a 403. */
+  async getGrantableScopes() {
+    return this.request<GrantableScopes>("/api/keys/scopes");
   }
 
   connectLiveSocket(onMessage: (data: Record<string, unknown>) => void): WebSocket | null {
