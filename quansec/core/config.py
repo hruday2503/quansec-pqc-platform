@@ -253,6 +253,7 @@ class Settings:
     # SSH
     SSH_AUTH_LOG: str = os.getenv("SSH_AUTH_LOG", "/var/log/auth.log")
     SSHD_CONFIG: str = os.getenv("SSHD_CONFIG", "/etc/ssh/sshd_config")
+    SSHD_CONFIG_BINARY: str = os.getenv("SSHD_CONFIG_BINARY", "/usr/sbin/sshd")
     SSH_POLL_INTERVAL: int = int(os.getenv("SSH_POLL_INTERVAL", "5"))
 
     # VPN

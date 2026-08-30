@@ -3,6 +3,12 @@
 Running QUANSEC: process management, monitoring, integration, and a
 troubleshooting matrix.
 
+> **Phase 1 deployment note:** the systemd monolith described below is retained
+> only as historical reference. The current backend is four independently
+> restartable containers and policy changes go through a restricted host agent;
+> there is no sudo/dev-mode path in the application. Follow
+> [CONTAINERS.md](CONTAINERS.md) for current startup and health procedures.
+
 - [1. Running the services](#1-running-the-services)
 - [2. Health monitoring](#2-health-monitoring)
 - [3. Prometheus and Grafana](#3-prometheus-and-grafana)

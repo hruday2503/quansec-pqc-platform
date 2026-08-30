@@ -164,6 +164,8 @@ reported.
 
 Full detail: **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**
 
+Phase 1 container deployment: **[docs/CONTAINERS.md](docs/CONTAINERS.md)**
+
 ---
 
 ## 4. Repository layout

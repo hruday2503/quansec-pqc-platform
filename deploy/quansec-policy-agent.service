@@ -1,0 +1,21 @@
+[Unit]
+Description=QUANSEC restricted host policy controller
+After=network.target
+
+[Service]
+Type=simple
+User=root
+Group=quansec-control
+RuntimeDirectory=quansec
+RuntimeDirectoryMode=0750
+WorkingDirectory=/opt/quansec/backend
+ExecStart=/usr/bin/python3 /opt/quansec/backend/host_policy_agent.py
+Restart=on-failure
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=-/etc/swanctl -/opt/openssh-pqc/etc /run/quansec
+
+[Install]
+WantedBy=multi-user.target

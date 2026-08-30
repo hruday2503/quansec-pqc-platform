@@ -1,0 +1,173 @@
+name: quansec
+
+x-backend-environment: &backend-environment
+  DATABASE_URL: postgresql://quansec_user:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/quansec
+  REDIS_URL: redis://redis:6379/0
+  JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
+  AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-false}
+  TRUSTED_PROXY: "true"
+  QUANSEC_TLS_ENABLED: "false"
+
+x-backend: &backend
+  build:
+    context: .
+  image: quansec/backend:phase1
+  restart: unless-stopped
+  init: true
+  read_only: true
+  tmpfs:
+    - /tmp:size=64m,noexec,nosuid,nodev
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  environment: *backend-environment
+  depends_on:
+    migrate:
+      condition: service_completed_successfully
+    redis:
+      condition: service_healthy
+
+services:
+  postgres:
+    image: postgres:16-bookworm
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: quansec
+      POSTGRES_USER: quansec_user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U quansec_user -d quansec"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-bookworm
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  migrate:
+    build:
+      context: .
+    image: quansec/backend:phase1
+    restart: "no"
+    read_only: true
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: ["ALL"]
+    environment: *backend-environment
+    command: ["python", "-m", "services.migrate"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    <<: *backend
+    command: ["uvicorn", "services.api:app", "--host", "0.0.0.0", "--port", "8000"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  ipsec-collector:
+    <<: *backend
+    user: "0:0"
+    command: ["python", "-m", "services.ipsec_worker"]
+    environment:
+      <<: *backend-environment
+      VICI_SOCKET: /run/strongswan/charon.vici
+    volumes:
+      - type: bind
+        source: /var/run/charon.vici
+        target: /run/strongswan/charon.vici
+        read_only: true
+        bind:
+          create_host_path: false
+
+  ssh-collector:
+    <<: *backend
+    user: "0:0"
+    network_mode: host
+    command: ["python", "-m", "services.ssh_worker"]
+    environment:
+      <<: *backend-environment
+      DATABASE_URL: postgresql://quansec_user:${POSTGRES_PASSWORD}@127.0.0.1:5432/quansec
+      REDIS_URL: redis://127.0.0.1:6379/0
+      QUANSEC_ZT_LOG: /host/var/log/auth.log
+      SSH_AUTH_LOG: /host/var/log/auth.log
+      SSHD_CONFIG: /opt/openssh-pqc/etc/sshd_config
+      SSHD_CONFIG_BINARY: /opt/openssh-pqc/sbin/sshd
+    volumes:
+      - /var/log:/host/var/log:ro
+      - type: bind
+        source: /run/log/journal
+        target: /run/log/journal
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: /etc/machine-id
+        target: /etc/machine-id
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: /opt/openssh-pqc
+        target: /opt/openssh-pqc
+        read_only: true
+        bind:
+          create_host_path: false
+
+  policy-engine:
+    <<: *backend
+    user: "0:0"
+    command: ["uvicorn", "services.policy:app", "--host", "0.0.0.0", "--port", "8001"]
+    environment:
+      <<: *backend-environment
+      QUANSEC_CONTROL_SOCKET: /run/quansec/policy.sock
+    volumes:
+      - type: bind
+        source: /run/quansec/policy.sock
+        target: /run/quansec/policy.sock
+        read_only: true
+        bind:
+          create_host_path: false
+
+  gateway:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    read_only: true
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: ["ALL"]
+    cap_add: ["NET_BIND_SERVICE"]
+    ports:
+      - "8000:8080"
+    volumes:
+      - ./deploy/nginx.conf:/etc/nginx/nginx.conf:ro
+    tmpfs:
+      - /var/cache/nginx
+      - /var/run
+      - /tmp
+    depends_on:
+      api:
+        condition: service_healthy
+      policy-engine:
+        condition: service_started
+
+volumes:
+  postgres-data:
+  redis-data:
