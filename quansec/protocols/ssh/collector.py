@@ -25,10 +25,11 @@ import subprocess
 from datetime import datetime, timezone
 
 import asyncpg
+from core.config import settings
 
 logger = logging.getLogger("quansec.ssh.collector")
 
-POLL_INTERVAL = 5
+POLL_INTERVAL = settings.SSH_POLL_INTERVAL
 
 # Map known sshd ports to the KEX they enforce.
 # 2222 = QUANSEC PQC sshd (mlkem768x25519). 22 = classical system sshd.
@@ -71,30 +72,6 @@ CREATE TABLE IF NOT EXISTS ssh_connections (
     last_seen    TIMESTAMPTZ DEFAULT NOW()
 );
 """
-
-
-def _read_configured_kex() -> str | None:
-    """Fallback: the first KexAlgorithms entry sshd is configured to offer."""
-    try:
-        out = subprocess.run(
-            ["sshd", "-T"], capture_output=True, text=True, timeout=5
-        ).stdout
-        for line in out.splitlines():
-            if line.lower().startswith("kexalgorithms"):
-                first = line.split()[1].split(",")[0]
-                return first
-    except Exception:
-        pass
-    # Last resort: parse the file directly
-    try:
-        with open("/etc/ssh/sshd_config") as f:
-            for line in f:
-                s = line.strip()
-                if s.startswith("KexAlgorithms") and not s.startswith("#"):
-                    return s.split()[1].split(",")[0].lstrip("+-^")
-    except Exception:
-        pass
-    return None
 
 
 def _classify(kex: str):
@@ -192,7 +169,6 @@ def _active_sessions() -> list[dict]:
 async def collect_once(pool: asyncpg.Pool):
     kex_map = _live_kex_by_peer()
     bytes_map = _read_bytes_by_peer()
-    configured = _read_configured_kex()
     sessions = _active_sessions()
 
     async with pool.acquire() as conn:
@@ -201,7 +177,10 @@ async def collect_once(pool: asyncpg.Pool):
         seen_keys = []
         for s in sessions:
             peer = s["peer"]
-            kex = kex_map.get(peer) or SSH_PORT_KEX.get(s.get("ssh_port","")) or configured or "unknown"
+            # Never report a port-to-policy guess as negotiated evidence. If
+            # journald has no matching VERBOSE event, the honest value is
+            # unknown even when the daemon configuration advertises PQC.
+            kex = kex_map.get(peer) or "unknown"
             label, kem, pqc = _classify(kex)
             session_key = f"{s['local']}->{peer}"
             seen_keys.append(session_key)
@@ -233,7 +212,7 @@ async def collect_once(pool: asyncpg.Pool):
         else:
             await conn.execute("UPDATE ssh_connections SET state='CLOSED' WHERE state='ACTIVE'")
 
-        pqc_count = sum(1 for s in sessions if _classify(kex_map.get(s["peer"]) or SSH_PORT_KEX.get(s.get("ssh_port",""),"") or "")[2])
+        pqc_count = sum(1 for s in sessions if _classify(kex_map.get(s["peer"]) or "unknown")[2])
         logger.info(f"SSH poll: {len(sessions)} sessions, {pqc_count} PQC-enabled")
 
 

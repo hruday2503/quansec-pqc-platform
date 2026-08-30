@@ -15,8 +15,8 @@ Requires passwordless sudo for the sshd binary + a killall, added via
 /etc/sudoers.d/quansec-ssh (see SSH_POLICY_SETUP.md).
 """
 
+import asyncio
 import logging
-import subprocess
 
 import asyncpg
 from fastapi import APIRouter, Depends, HTTPException
@@ -24,6 +24,7 @@ from pydantic import BaseModel
 
 from core.database import get_db
 from core.auth import require_user, require_admin
+from core.host_control import HostControlError, host_control_request
 
 logger = logging.getLogger("quansec.ssh.policy")
 router = APIRouter(prefix="/api/ssh/policies", tags=["SSH Policy"])
@@ -74,94 +75,32 @@ async def list_ssh_policies():
 
 @router.post("/apply", dependencies=[Depends(require_admin)])
 async def apply_ssh_policy(payload: SshPolicyApply, conn: asyncpg.Connection = Depends(get_db)):
-    import os
     policy = SSH_POLICIES.get(payload.policy_name)
     if not policy:
         raise HTTPException(status_code=400, detail=f"Unknown policy. Available: {list(SSH_POLICIES.keys())}")
 
-    pqc_sshd_available = os.path.exists(PQC_SSHD_CONFIG)
-    dev_mode = not pqc_sshd_available
-
-    if dev_mode:
-        # ── Dev / Demo mode: PQC sshd not installed ───────────────────────────
-        import pathlib
-        dev_sshd_dir = pathlib.Path("/tmp/quansec/sshd")
-        dev_sshd_dir.mkdir(parents=True, exist_ok=True)
-        dev_sshd_conf = dev_sshd_dir / "sshd_config"
-        dev_sshd_conf.write_text(
-            f"# QUANSEC dev-mode SSH policy simulation\n"
-            f"KexAlgorithms {policy['kex']}\n"
-            f"Port 2222\n"
+    try:
+        result = await asyncio.to_thread(
+            host_control_request, "apply_ssh", {"policy_name": payload.policy_name}
         )
-        logger.warning(
-            f"PQC sshd not installed — SSH policy '{payload.policy_name}' saved to "
-            f"{dev_sshd_conf} (dev mode). Install openssh-pqc to apply to a real daemon."
-        )
-        message = (
-            f"[DEV MODE] PQC sshd not installed. Policy '{payload.policy_name}' (KEX={policy['kex']}) "
-            f"simulated. Install openssh-pqc to apply to a live daemon."
-        )
-    else:
-        # ── Production: patch real sshd_config and restart ───────────────────
-        try:
-            with open(PQC_SSHD_CONFIG) as f:
-                lines = f.readlines()
-        except FileNotFoundError:
-            raise HTTPException(status_code=500, detail="PQC sshd_config not found on this host")
-
-        new_lines = []
-        replaced = False
-        for line in lines:
-            if line.strip().startswith("KexAlgorithms"):
-                new_lines.append(f"KexAlgorithms {policy['kex']}\n")
-                replaced = True
-            else:
-                new_lines.append(line)
-        if not replaced:
-            new_lines.append(f"KexAlgorithms {policy['kex']}\n")
-
-        config_text = "".join(new_lines)
-        try:
-            proc = subprocess.run(
-                ["sudo", "tee", PQC_SSHD_CONFIG],
-                input=config_text, capture_output=True, text=True, timeout=10,
-            )
-            if proc.returncode != 0:
-                raise HTTPException(status_code=500, detail=f"Cannot write sshd_config: {proc.stderr}")
-        except subprocess.SubprocessError as e:
-            raise HTTPException(status_code=500, detail=f"Config write failed: {e}")
-
-        check = subprocess.run(
-            ["sudo", PQC_SSHD_BIN, "-t", "-f", PQC_SSHD_CONFIG],
-            capture_output=True, text=True, timeout=10
-        )
-        if check.returncode != 0:
-            raise HTTPException(status_code=500, detail=f"sshd config invalid: {check.stderr}")
-
-        subprocess.run(["sudo", "pkill", "-f", f"{PQC_SSHD_BIN}.*2222"], capture_output=True, timeout=10)
-        restart = subprocess.run(
-            ["sudo", PQC_SSHD_BIN, "-f", PQC_SSHD_CONFIG],
-            capture_output=True, text=True, timeout=10
-        )
-        if restart.returncode != 0:
-            raise HTTPException(status_code=500, detail=f"sshd restart failed: {restart.stderr}")
-
-        message = "sshd restarted. New SSH connections use the new KEX. Reconnect to apply."
+    except HostControlError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
     await conn.execute(
         "INSERT INTO audit_events (action, resource, detail, severity) VALUES ($1,$2,$3,$4)",
         "ssh_policy_apply", "ssh",
-        f'{{"policy":"{payload.policy_name}","dev_mode":{str(dev_mode).lower()}}}', "warning",
+        f'{{"policy":"{payload.policy_name}","real_daemon":true}}', "warning",
     )
     await _record_policy(conn, payload.policy_name, policy["kex"])
-    logger.info(f"Applied SSH policy {payload.policy_name} (KEX={policy['kex']}, dev_mode={dev_mode})")
+    logger.info("Applied SSH policy %s to real PQC sshd", payload.policy_name)
     return {
         "status": "applied",
         "policy": payload.policy_name,
         "kex": policy["kex"],
         "pqc_enabled": policy["pqc"],
-        "dev_mode": dev_mode,
-        "message": message,
+        "real_daemon": True,
+        "message": "PQC sshd accepted the configuration and was reloaded.",
+        "controller": result,
     }
 
 

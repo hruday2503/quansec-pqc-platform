@@ -1,0 +1,9 @@
+.git
+.env
+.venv
+**/__pycache__
+**/*.pyc
+quansec-ui/node_modules
+quansec-ui/.next
+*.tar.gz
+*.gz

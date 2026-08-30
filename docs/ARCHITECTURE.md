@@ -1,5 +1,10 @@
 # Architecture
 
+> **Phase 1 process split:** the logical layers below now execute as separate
+> API, IPsec collector, SSH collector, and policy-engine containers. See
+> [CONTAINERS.md](CONTAINERS.md) for the runtime/privilege boundaries. The API
+> no longer owns collector lifecycle tasks.
+
 How QUANSEC is put together, why the boundaries sit where they do, and what
 happens on every request and every collector tick.
 

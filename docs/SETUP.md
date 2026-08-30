@@ -1,5 +1,10 @@
 # Setup — end to end
 
+> The backend container/process setup has moved to
+> [CONTAINERS.md](CONTAINERS.md). This document remains the data-plane build
+> guide. Its unpinned liboqs commands must be resolved by Phase 1 Task 2 before
+> they are treated as a reproducible production build.
+
 From a bare Ubuntu machine to a live post-quantum IPsec tunnel and PQC SSH
 session visible in the dashboard.
 
