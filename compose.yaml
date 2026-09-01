@@ -139,10 +139,11 @@ services:
     environment:
       <<: *backend-environment
       QUANSEC_CONTROL_SOCKET: /run/quansec/policy.sock
+      QUANSEC_REQUIRED_POLICY_TARGETS: strongswan
     volumes:
       - type: bind
-        source: /run/quansec/policy.sock
-        target: /run/quansec/policy.sock
+        source: /run/quansec
+        target: /run/quansec
         read_only: true
         bind:
           create_host_path: false
@@ -153,9 +154,9 @@ services:
     read_only: true
     security_opt: ["no-new-privileges:true"]
     cap_drop: ["ALL"]
-    cap_add: ["NET_BIND_SERVICE"]
+    cap_add: ["CHOWN", "SETGID", "SETUID"]
     ports:
-      - "8000:8080"
+      - "127.0.0.1:8000:8080"
     volumes:
       - ./deploy/nginx.conf:/etc/nginx/nginx.conf:ro
     tmpfs:
