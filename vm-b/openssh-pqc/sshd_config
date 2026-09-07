@@ -6,8 +6,8 @@ HostKey /opt/openssh-pqc/etc/ssh_host_rsa_key
 # Post-quantum hybrid KEX ONLY \u2014 classical rejected
 KexAlgorithms mlkem768x25519-sha256
 
-# Verbose logging so QUANSEC can read the negotiated KEX
-LogLevel VERBOSE
+# DEBUG1 logging so QUANSEC can read the negotiated KEX
+LogLevel DEBUG1
 SyslogFacility AUTH
 
 PermitRootLogin no

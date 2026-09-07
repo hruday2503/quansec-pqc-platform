@@ -308,10 +308,10 @@ every 5 s
   │                       keep rows where local or peer port ∈ {22, 2222}
   │                       tag each with which port matched
   │
-  _live_kex_by_peer()     journalctl -u ssh -u sshd --since -10min
+  _live_kex_by_peer()     journalctl -u ssh -u sshd -u quansec-pqc-sshd.service --since -10min
   │                       track "Connection from <ip> port <n>"
   │                       then "kex: algorithm: <name>"  → map peer → KEX
-  │                       (requires sshd LogLevel VERBOSE)
+  │                       (requires sshd LogLevel DEBUG1)
   │
   _read_bytes_by_peer()   ss -tin → bytes_sent / bytes_received per peer
   │

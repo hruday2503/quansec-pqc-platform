@@ -9,13 +9,16 @@ import json
 import os
 import pathlib
 import re
-import shutil
 import socketserver
 import subprocess
 import tempfile
 
 SOCKET_PATH = os.environ.get("QUANSEC_CONTROL_SOCKET", "/run/quansec/policy.sock")
-SWANCTL_CONFIG = pathlib.Path(os.environ.get("QUANSEC_SWANCTL_CONFIG", "/etc/swanctl/swanctl.conf"))
+SWANCTL_CONFIG = pathlib.Path(os.environ.get("QUANSEC_SWANCTL_CONFIG", "/etc/quansec-strongswan/swanctl/swanctl.conf"))
+SWANCTL_BIN = os.environ.get(
+    "QUANSEC_SWANCTL_BIN", "/opt/quansec-pqc/sbin/swanctl"
+)
+
 PQC_SSHD_CONFIG = pathlib.Path(os.environ.get("QUANSEC_PQC_SSHD_CONFIG", "/opt/openssh-pqc/etc/sshd_config"))
 PQC_SSHD_BIN = os.environ.get("QUANSEC_PQC_SSHD_BIN", "/opt/openssh-pqc/sbin/sshd")
 PQC_SSHD_SERVICE = os.environ.get("QUANSEC_PQC_SSHD_SERVICE", "quansec-pqc-sshd.service")
@@ -63,7 +66,7 @@ def apply_ipsec(parameters: dict) -> dict:
     policy = parameters.get("policy_name")
     if policy not in IPSEC_POLICIES:
         raise ValueError("IPsec policy is not allow-listed")
-    if not SWANCTL_CONFIG.is_file() or not shutil.which("swanctl"):
+    if not SWANCTL_CONFIG.is_file() or not os.path.isfile(SWANCTL_BIN):
         raise RuntimeError("real StrongSwan swanctl runtime/configuration is missing")
     ike, esp = IPSEC_POLICIES[policy]
     config = SWANCTL_CONFIG.read_text()
@@ -77,11 +80,11 @@ def apply_ipsec(parameters: dict) -> dict:
         raise RuntimeError("real swanctl config must contain one proposals and one esp_proposals line")
     previous = _atomic_replace(SWANCTL_CONFIG, config)
     try:
-        output = _run([shutil.which("swanctl"), "--load-all", "--noprompt"])
+        output = _run([SWANCTL_BIN, "--load-all", "--noprompt"])
     except Exception:
         _restore(SWANCTL_CONFIG, previous)
         try:
-            _run([shutil.which("swanctl"), "--load-all", "--noprompt"])
+            _run([SWANCTL_BIN, "--load-all", "--noprompt"])
         except Exception:
             pass
         raise
@@ -116,7 +119,7 @@ def apply_ssh(parameters: dict) -> dict:
 
 def status(_: dict) -> dict:
     return {
-        "strongswan": SWANCTL_CONFIG.is_file() and shutil.which("swanctl") is not None,
+        "strongswan": SWANCTL_CONFIG.is_file() and os.path.isfile(SWANCTL_BIN),
         "openssh_pqc": PQC_SSHD_CONFIG.is_file() and os.path.isfile(PQC_SSHD_BIN),
     }
 

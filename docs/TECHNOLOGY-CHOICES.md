@@ -348,7 +348,7 @@ order:
 
 | Priority | Source | What it proves | Fails when |
 |---|---|---|---|
-| 1 | `journalctl` → `kex: algorithm: <name>` | What was **actually negotiated** | `LogLevel VERBOSE` not set, journald unreadable, entry rotated out |
+| 1 | `journalctl` → `kex: algorithm: <name>` | What was **actually negotiated** | `LogLevel DEBUG1` not set, journald unreadable, entry rotated out |
 | 2 | Port → KEX map (`2222 → mlkem768x25519`) | What this listener **enforces** | Only valid for known ports |
 | 3 | `sshd -T` → `KexAlgorithms` | What the daemon **offers** | Never fails, but is the weakest claim |
 

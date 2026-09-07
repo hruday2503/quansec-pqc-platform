@@ -549,7 +549,7 @@ See [SETUP.md §6.3](SETUP.md#63-issue-a-certificate).
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| `kex_algorithm: "unknown"` | All three detection tiers failed | `LogLevel VERBOSE`; add user to `systemd-journal` |
+| `kex_algorithm: "unknown"` | All three detection tiers failed | `LogLevel DEBUG1`; add user to `systemd-journal` |
 | Port-2222 session shows classical | journald read failed; fell back to the *system* sshd's KEX | `journalctl -u ssh --since -5min \| grep "kex:"` |
 | No sessions at all | None established | `ss -tnp state established \| grep -E ':(22\|2222)'` |
 | Sessions never close | The collector is not completing cycles | Check `/health` |

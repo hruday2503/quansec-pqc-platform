@@ -9,13 +9,21 @@ Group=quansec-control
 RuntimeDirectory=quansec
 RuntimeDirectoryMode=0750
 WorkingDirectory=/opt/quansec/backend
+Environment=QUANSEC_SWANCTL_CONFIG=/etc/quansec-strongswan/swanctl/swanctl.conf
+Environment=QUANSEC_SWANCTL_BIN=/opt/quansec-pqc/sbin/swanctl
 ExecStart=/usr/bin/python3 /opt/quansec/backend/host_policy_agent.py
 Restart=on-failure
 NoNewPrivileges=true
 PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_UNIX
+UMask=0007
 ProtectHome=true
 ProtectSystem=strict
-ReadWritePaths=-/etc/swanctl -/opt/openssh-pqc/etc /run/quansec
+ReadWritePaths=-/etc/quansec-strongswan -/opt/openssh-pqc/etc /run/quansec
 
 [Install]
 WantedBy=multi-user.target

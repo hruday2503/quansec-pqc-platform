@@ -99,6 +99,9 @@ services:
           create_host_path: false
 
   ssh-collector:
+    group_add:
+      - "${AUTH_LOG_GID:-4}"
+      - "${JOURNAL_GID:-999}"
     <<: *backend
     user: "0:0"
     network_mode: host
@@ -113,6 +116,12 @@ services:
       SSHD_CONFIG_BINARY: /opt/openssh-pqc/sbin/sshd
     volumes:
       - /var/log:/host/var/log:ro
+      - type: bind
+        source: /var/log/journal
+        target: /var/log/journal
+        read_only: true
+        bind:
+          create_host_path: false
       - type: bind
         source: /run/log/journal
         target: /run/log/journal

@@ -479,7 +479,7 @@ HostKey /opt/openssh-pqc/etc/ssh_host_rsa_key
 
 KexAlgorithms mlkem768x25519-sha256      # PQC hybrid ONLY — classical refused
 
-LogLevel VERBOSE                          # REQUIRED: emits "kex: algorithm: …"
+LogLevel DEBUG1                          # REQUIRED: emits "kex: algorithm: …"
 SyslogFacility AUTH
 
 PermitRootLogin no
@@ -500,7 +500,7 @@ Two lines carry the most weight:
   fallback. This is *fail-closed* expressed in configuration: a client that
   cannot do hybrid ML-KEM is refused rather than downgraded. A downgrade attack
   has nothing to downgrade to.
-- **`LogLevel VERBOSE`** — without it sshd never logs
+- **`LogLevel DEBUG1`** — without it sshd never logs
   `kex: algorithm: mlkem768x25519-sha256`, `_live_kex_by_peer()` returns an empty
   map, and the collector silently drops to port-implied detection. Everything
   still works; it just stops being evidence of what was actually negotiated.
@@ -912,7 +912,7 @@ websocat ws://localhost:8000/api/ws/live        # then bounce the tunnel
 | `StrongSwan VICI socket not available` every 5 s | charon down, or socket unreadable | `systemctl status strongswan`; check permissions (§4.6) |
 | Tunnel `NO_PROPOSAL_CHOSEN` | ml-kem plugin not loaded, or `accept_private_algs` missing | `swanctl --stats \| grep ml-kem`; install both drop-ins (§4.4) |
 | Tunnel up but `pqc_enabled: false` | The negotiated proposal genuinely lacks a PQC KEM | `swanctl --list-sas` — if it shows `ECP_384`, the peer downgraded |
-| SSH sessions show `kex_algorithm: unknown` | `LogLevel VERBOSE` missing, or journald unreadable | Set it in `sshd_config`; add the user to `systemd-journal` |
+| SSH sessions show `kex_algorithm: unknown` | `LogLevel DEBUG1` missing, or journald unreadable | Set it in `sshd_config`; add the user to `systemd-journal` |
 | SSH shows classical for a port-2222 session | journald read failed, fell back to configured KEX | Same as above; check `journalctl -u ssh --since -5min` |
 | Policy apply returns `dev_mode: true` | `/etc/swanctl` or the PQC sshd_config is absent | Install the daemon, or accept dev mode for a demo |
 | Policy apply → 500 "Cannot write swanctl.conf" | Backend lacks write permission | §9 |
