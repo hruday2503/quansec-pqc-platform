@@ -10,7 +10,7 @@ lets the API serve it.
 Detection strategy:
   1. `ss -tnp` / `who` gives us active sshd sessions (pids, peers).
   2. For the negotiated KEX we read sshd's own logging. When sshd is
-     started with `LogLevel VERBOSE`, each connection logs a line like:
+     started with `LogLevel DEBUG1`, each connection logs a line like:
         "kex: algorithm: mlkem768x25519-sha256"
      We tail the auth log and map the most recent KEX per connection.
   3. If we can't read a live KEX (log rotated, permission), we fall back
@@ -86,13 +86,24 @@ def _classify(kex: str):
 
 def _live_kex_by_peer() -> dict:
     """
-    Parse recent sshd VERBOSE logs to map "ip:port" -> kex algorithm.
-    Works when sshd LogLevel is VERBOSE and journald is readable.
+    Parse recent sshd DEBUG1 logs to map "ip:port" -> kex algorithm.
+    Works when sshd LogLevel is DEBUG1 and journald is readable.
     """
     mapping = {}
     try:
         out = subprocess.run(
-            ["journalctl", "-u", "ssh", "-u", "sshd", "--since", "-10min", "--no-pager"],
+            [
+                "journalctl",
+                "-u",
+                "ssh",
+                "-u",
+                "sshd",
+                "-u",
+                "quansec-pqc-sshd.service",
+                "--since",
+                "-10min",
+                "--no-pager",
+            ],
             capture_output=True, text=True, timeout=6,
         ).stdout
         cur_peer = None

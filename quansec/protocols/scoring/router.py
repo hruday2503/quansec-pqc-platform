@@ -161,10 +161,9 @@ async def score_tls(conn: asyncpg.Connection = Depends(get_db)):
       score with a property the platform does not have.
     """
     rows = await conn.fetch(
-        """SELECT named_group, pqc_enabled, tls_version, outcome
+        """SELECT negotiated_group, pqc_enabled
            FROM tls_sessions
-           WHERE outcome = 'success'
-           ORDER BY observed_at DESC
+           ORDER BY occurred_at DESC
            LIMIT 500"""
     )
 
@@ -183,7 +182,7 @@ async def score_tls(conn: asyncpg.Connection = Depends(get_db)):
             },
             "weights": _WEIGHTS,
             "observations_evaluated": 0,
-            "note": "No successful TLS observations recorded yet.",
+            "note": "No TLS observations recorded yet.",
         }
 
     total = len(rows)
@@ -193,7 +192,7 @@ async def score_tls(conn: asyncpg.Connection = Depends(get_db)):
     # A verified hybrid handshake scores as the configured group; anything else
     # is classical by observation.
     strengths = [
-        _algo_strength(r["named_group"] or "x25519mlkem768") if r["pqc_enabled"]
+        _algo_strength(r["negotiated_group"] or "x25519mlkem768") if r["pqc_enabled"]
         else _algo_strength("x25519")
         for r in rows
     ]

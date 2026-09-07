@@ -140,7 +140,7 @@ order, and the module always reports which one it used.
 
 | Priority | Source | Command | Proves | Fails when |
 |---|---|---|---|---|
-| **1** | journald | `journalctl -u ssh -u sshd --since -10min` | What was **actually negotiated** | `LogLevel VERBOSE` unset, journald unreadable, entry aged out |
+| **1** | journald | `journalctl -u ssh -u sshd -u quansec-pqc-sshd.service --since -10min` | What was **actually negotiated** | `LogLevel DEBUG1` unset, journald unreadable, entry aged out |
 | **2** | Port map | — | What that listener **enforces** | Only for known ports (22, 2222) |
 | **3** | `sshd -T` | `sshd -T \| grep kexalgorithms` | What the daemon **offers** | Never fails; weakest claim |
 
@@ -150,7 +150,7 @@ kex = kex_map.get(peer) or SSH_PORT_KEX.get(ssh_port) or configured or "unknown"
 
 ### 4.1 Tier 1 — journald
 
-With `LogLevel VERBOSE`, sshd logs two correlated lines per connection:
+With `LogLevel DEBUG1`, sshd logs two correlated lines per connection:
 
 ```
 sshd[1234]: Connection from 192.168.1.6 port 54321
@@ -585,7 +585,7 @@ Full schema and the runtime-vs-migration divergence:
 
 | Situation | What to check |
 |---|---|
-| `kex_algorithm: "unknown"` | Tier 1 and 3 both failed. Set `LogLevel VERBOSE`; add the backend user to `systemd-journal`. |
+| `kex_algorithm: "unknown"` | Tier 1 and 3 both failed. Set `LogLevel DEBUG1`; add the backend user to `systemd-journal`. |
 | A 2222 session shows classical | journald read failed and tier 3 returned the *system* sshd's KEX. Verify `journalctl -u ssh --since -5min \| grep "kex:"`. |
 | No sessions at all | `ss -tnp state established \| grep -E ':(22\|2222)'`. If empty, there genuinely are none. |
 | Sessions never close | The `CLOSED` sweep runs only when the collector completes a cycle. Check the collector is alive in `/health`. |

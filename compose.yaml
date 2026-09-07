@@ -77,6 +77,16 @@ services:
   api:
     <<: *backend
     command: ["uvicorn", "services.api:app", "--host", "0.0.0.0", "--port", "8000"]
+    environment:
+      <<: *backend-environment
+      QUANSEC_CA_PUB: /run/quansec-ca/quansec_ca.pub
+    volumes:
+      - type: bind
+        source: /opt/openssh-pqc/etc/quansec_ca.pub
+        target: /run/quansec-ca/quansec_ca.pub
+        read_only: true
+        bind:
+          create_host_path: false
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
       interval: 10s
@@ -99,6 +109,9 @@ services:
           create_host_path: false
 
   ssh-collector:
+    group_add:
+      - "${AUTH_LOG_GID:-4}"
+      - "${JOURNAL_GID:-999}"
     <<: *backend
     user: "0:0"
     network_mode: host
@@ -113,6 +126,12 @@ services:
       SSHD_CONFIG_BINARY: /opt/openssh-pqc/sbin/sshd
     volumes:
       - /var/log:/host/var/log:ro
+      - type: bind
+        source: /var/log/journal
+        target: /var/log/journal
+        read_only: true
+        bind:
+          create_host_path: false
       - type: bind
         source: /run/log/journal
         target: /run/log/journal
@@ -139,10 +158,11 @@ services:
     environment:
       <<: *backend-environment
       QUANSEC_CONTROL_SOCKET: /run/quansec/policy.sock
+      QUANSEC_REQUIRED_POLICY_TARGETS: strongswan
     volumes:
       - type: bind
-        source: /run/quansec/policy.sock
-        target: /run/quansec/policy.sock
+        source: /run/quansec
+        target: /run/quansec
         read_only: true
         bind:
           create_host_path: false
@@ -153,9 +173,9 @@ services:
     read_only: true
     security_opt: ["no-new-privileges:true"]
     cap_drop: ["ALL"]
-    cap_add: ["NET_BIND_SERVICE"]
+    cap_add: ["CHOWN", "SETGID", "SETUID"]
     ports:
-      - "8000:8080"
+      - "127.0.0.1:8000:8080"
     volumes:
       - ./deploy/nginx.conf:/etc/nginx/nginx.conf:ro
     tmpfs:

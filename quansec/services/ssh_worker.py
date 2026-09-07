@@ -20,16 +20,18 @@ def require_host_ssh_telemetry() -> None:
         raise RuntimeError("real host journald directory is not mounted at /run/log/journal")
     if not os.path.isfile(sshd_binary) or not os.path.isfile(sshd_config):
         raise RuntimeError("real /opt/openssh-pqc binary/configuration is not mounted")
-    validation = subprocess.run(
-        [sshd_binary, "-t", "-f", sshd_config], capture_output=True, text=True, timeout=5
-    )
-    if validation.returncode:
-        raise RuntimeError(f"real PQC sshd configuration is invalid: {validation.stderr.strip()}")
+    # The host systemd unit validates sshd_config with ExecStartPre.
+    # Do not execute a host-linked binary inside a container with a
+    # potentially incompatible libc. Verify the live listener instead.
     if not shutil.which("ss"):
         raise RuntimeError("ss is required to inspect real host TCP sessions")
-    check = subprocess.run(["ss", "-Htn"], capture_output=True, text=True, timeout=5)
+    check = subprocess.run(["ss", "-Hltn"], capture_output=True, text=True, timeout=5)
     if check.returncode:
         raise RuntimeError(f"cannot inspect host network namespace: {check.stderr.strip()}")
+
+    ssh_port = os.environ.get("PQC_SSH_PORT", "2222")
+    if f":{ssh_port}" not in check.stdout:
+        raise RuntimeError(f"real PQC sshd is not listening on port {ssh_port}")
 
 
 async def main() -> None:
