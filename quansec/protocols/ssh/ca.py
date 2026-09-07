@@ -38,7 +38,7 @@ logger = logging.getLogger("quansec.ssh.ca")
 router = APIRouter(prefix="/api/ssh/ca", tags=["SSH Certificate Authority"])
 
 CA_KEY = os.environ.get("QUANSEC_CA_KEY", os.path.expanduser("~/quansec-ca/quansec_ca"))
-CA_PUB = CA_KEY + ".pub"
+CA_PUB = os.environ.get("QUANSEC_CA_PUB", CA_KEY + ".pub")
 
 CREATE_TABLE = """
 CREATE TABLE IF NOT EXISTS issued_certs (

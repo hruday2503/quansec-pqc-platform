@@ -5,6 +5,7 @@ import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from core.database import close_pool, get_pool
 from core.host_control import host_control_request
@@ -35,6 +36,13 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title="QUANSEC Policy Engine", version="2.1.0", lifespan=lifespan)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "https://localhost:443"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 app.include_router(ipsec_policy_router)
 app.include_router(ssh_policy_router)
 

@@ -77,6 +77,16 @@ services:
   api:
     <<: *backend
     command: ["uvicorn", "services.api:app", "--host", "0.0.0.0", "--port", "8000"]
+    environment:
+      <<: *backend-environment
+      QUANSEC_CA_PUB: /run/quansec-ca/quansec_ca.pub
+    volumes:
+      - type: bind
+        source: /opt/openssh-pqc/etc/quansec_ca.pub
+        target: /run/quansec-ca/quansec_ca.pub
+        read_only: true
+        bind:
+          create_host_path: false
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
       interval: 10s

@@ -9,16 +9,16 @@ const API_BASE = process.env.NEXT_PUBLIC_QUANSEC_API || "http://localhost:8000";
 
 export default function SshPortalOverview() {
   const [stats, setStats] = useState<{ active: number; pqc_enabled: number; pqc_coverage: number } | null>(null);
-  const [days, setDays] = useState<number | null>(null);
 
   const load = async () => {
     try {
-      const [s, cmp] = await Promise.all([
-        fetch(`${API_BASE}/api/ssh/stats`, { headers: authHeaders() }).then((r) => r.json()),
-        fetch(`${API_BASE}/api/ssh/policies/compare`, { headers: authHeaders() }).then((r) => r.json()),
-      ]);
-      setStats(s);
-      setDays(cmp.days_remaining);
+      const response = await fetch(`${API_BASE}/api/ssh/stats`, {
+        headers: authHeaders(),
+      });
+      if (!response.ok) {
+        throw new Error(`SSH stats request failed: ${response.status}`);
+      }
+      setStats(await response.json());
     } catch { /* ignore */ }
   };
 
@@ -84,13 +84,6 @@ export default function SshPortalOverview() {
         </div>
       </Link>
 
-      {days !== null && (
-        <div className="mt-6 text-center">
-          <span className="text-xs font-mono-display" style={{ color: "var(--text-tertiary)" }}>
-            {days.toLocaleString()} days to the CNSA 2.0 SSH deadline (2030)
-          </span>
-        </div>
-      )}
     </div>
   );
 }
