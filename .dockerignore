@@ -3,7 +3,7 @@
 .venv
 **/__pycache__
 **/*.pyc
-quanseq-ui/node_modules
-quanseq-ui/.next
+quansec-ui/node_modules
+quansec-ui/.next
 *.tar.gz
 *.gz

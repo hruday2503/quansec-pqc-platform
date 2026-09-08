@@ -26,7 +26,7 @@ Post-quantum IKEv2 with ML-KEM-1024, monitored through StrongSwan's VICI socket.
 StrongSwan charon ──VICI poll (5 s)──► collector ──► ipsec_tunnels ──► REST ──► portal
         │                                                                          ▲
         └──VICI event subscription──► event listener ──► ipsec_events ──► Redis ──► WS
-                                                                    quanseq:live
+                                                                    quansec:live
 policy engine ──writes /etc/swanctl/swanctl.conf──► swanctl --load-all ──► charon
 ```
 
@@ -111,7 +111,7 @@ classical option is trivially downgrade-proof; and it proves the plugin
 negotiates standalone rather than riding behind an ECDH exchange doing the real
 work.
 
-The hybrid form is available. `quanseq/strongswan/swanctl.conf` contains
+The hybrid form is available. `quansec/strongswan/swanctl.conf` contains
 `proposals = aes256gcm128-prfsha384-ecp384+mlkem1024`, which is RFC 9370
 additional key exchange — ECDH first, ML-KEM as an additional round. Use it when
 peer interoperability matters more than a clean end-state demonstration.
@@ -120,7 +120,7 @@ peer interoperability matters more than a clean end-state demonstration.
 
 ## 4. The ML-KEM StrongSwan plugin
 
-Source: `quanseq/compiled-backup/ml_kem_source/`
+Source: `quansec/compiled-backup/ml_kem_source/`
 
 ### 4.1 Registration
 
@@ -309,7 +309,7 @@ Two details worth noting:
 - **`COALESCE` on `established_at`** preserves the original establishment time if
   a later poll reports `NULL` — the tunnel did not re-establish just because one
   poll could not compute the timestamp.
-- **`created_at` is never updated**, so it remains the time QUANSEQ first saw the
+- **`created_at` is never updated**, so it remains the time QUANSEC first saw the
   tunnel.
 
 The whole batch runs in one transaction, so a dashboard read never sees a
@@ -337,7 +337,7 @@ missed cycles from a transient VICI hiccup without flapping a tunnel's state.
  "pqc_count":1,"pqc_pct":100.0,"timestamp":"2026-07-29T…Z"}
 ```
 
-Published to `quanseq:live` every cycle. If Redis is unavailable the collector
+Published to `quansec:live` every cycle. If Redis is unavailable the collector
 logs once and continues — no data is lost, only push latency.
 
 ---
@@ -425,7 +425,7 @@ POST /api/ipsec/policies/apply   {"policy_name": "pqc-level5"}   [admin]
    existing `/etc/swanctl/swanctl.conf`, so applying a policy never changes the
    tunnel's endpoints. Falls back to `192.168.1.6` / `192.168.1.7` if unreadable.
 3. Render `SWANCTL_TEMPLATE` with the proposals and addresses substituted.
-4. **Dev mode** (no `/etc/swanctl`): write `/tmp/quanseq/swanctl/swanctl.conf`,
+4. **Dev mode** (no `/etc/swanctl`): write `/tmp/quansec/swanctl/swanctl.conf`,
    log a warning, return `dev_mode: true`.
    **Production**: write the real file, then `sudo swanctl --load-all`.
 5. Insert an `audit_events` row (`policy_apply`, severity `warning`).
@@ -594,7 +594,7 @@ All endpoints require authentication. `/api/ipsec/*` (the main router) declares
 
 ### WebSocket
 
-`ws://host:8000/api/ws/live` — subscribes to `quanseq:live`. Sends a `connected`
+`ws://host:8000/api/ws/live` — subscribes to `quansec:live`. Sends a `connected`
 frame on accept, then forwards every published message. Carries both IPsec and
 SSH traffic; filter on `protocol`. Currently unauthenticated — see
 [SECURITY.md](../SECURITY.md).

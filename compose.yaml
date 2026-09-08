@@ -1,17 +1,17 @@
-name: quanseq
+name: quansec
 
 x-backend-environment: &backend-environment
-  DATABASE_URL: postgresql://quanseq_user:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/quanseq
+  DATABASE_URL: postgresql://quansec_user:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/quansec
   REDIS_URL: redis://redis:6379/0
   JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
   AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-false}
   TRUSTED_PROXY: "true"
-  QUANSEQ_TLS_ENABLED: "false"
+  QUANSEC_TLS_ENABLED: "false"
 
 x-backend: &backend
   build:
     context: .
-  image: quanseq/backend:phase1
+  image: quansec/backend:phase1
   restart: unless-stopped
   init: true
   read_only: true
@@ -33,15 +33,15 @@ services:
     image: postgres:16-bookworm
     restart: unless-stopped
     environment:
-      POSTGRES_DB: quanseq
-      POSTGRES_USER: quanseq_user
+      POSTGRES_DB: quansec
+      POSTGRES_USER: quansec_user
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
     ports:
       - "127.0.0.1:5432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U quanseq_user -d quanseq"]
+      test: ["CMD-SHELL", "pg_isready -U quansec_user -d quansec"]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -63,7 +63,7 @@ services:
   migrate:
     build:
       context: .
-    image: quanseq/backend:phase1
+    image: quansec/backend:phase1
     restart: "no"
     read_only: true
     security_opt: ["no-new-privileges:true"]
@@ -79,11 +79,11 @@ services:
     command: ["uvicorn", "services.api:app", "--host", "0.0.0.0", "--port", "8000"]
     environment:
       <<: *backend-environment
-      QUANSEQ_CA_PUB: /run/quanseq-ca/quanseq_ca.pub
+      QUANSEC_CA_PUB: /run/quansec-ca/quansec_ca.pub
     volumes:
       - type: bind
-        source: /opt/openssh-pqc/etc/quanseq_ca.pub
-        target: /run/quanseq-ca/quanseq_ca.pub
+        source: /opt/openssh-pqc/etc/quansec_ca.pub
+        target: /run/quansec-ca/quansec_ca.pub
         read_only: true
         bind:
           create_host_path: false
@@ -118,9 +118,9 @@ services:
     command: ["python", "-m", "services.ssh_worker"]
     environment:
       <<: *backend-environment
-      DATABASE_URL: postgresql://quanseq_user:${POSTGRES_PASSWORD}@127.0.0.1:5432/quanseq
+      DATABASE_URL: postgresql://quansec_user:${POSTGRES_PASSWORD}@127.0.0.1:5432/quansec
       REDIS_URL: redis://127.0.0.1:6379/0
-      QUANSEQ_ZT_LOG: /host/var/log/auth.log
+      QUANSEC_ZT_LOG: /host/var/log/auth.log
       SSH_AUTH_LOG: /host/var/log/auth.log
       SSHD_CONFIG: /opt/openssh-pqc/etc/sshd_config
       SSHD_CONFIG_BINARY: /opt/openssh-pqc/sbin/sshd
@@ -157,12 +157,12 @@ services:
     command: ["uvicorn", "services.policy:app", "--host", "0.0.0.0", "--port", "8001"]
     environment:
       <<: *backend-environment
-      QUANSEQ_CONTROL_SOCKET: /run/quanseq/policy.sock
-      QUANSEQ_REQUIRED_POLICY_TARGETS: strongswan
+      QUANSEC_CONTROL_SOCKET: /run/quansec/policy.sock
+      QUANSEC_REQUIRED_POLICY_TARGETS: strongswan
     volumes:
       - type: bind
-        source: /run/quanseq
-        target: /run/quanseq
+        source: /run/quansec
+        target: /run/quansec
         read_only: true
         bind:
           create_host_path: false

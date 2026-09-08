@@ -13,8 +13,8 @@ __pycache__/
 *-cert.pub
 id_ed25519*
 id_rsa*
-quanseq_ca
-quanseq_ca.pub
+quansec_ca
+quansec_ca.pub
 known_hosts
 
 # ── TLS development PKI ──────────────────────────────────────────────────────
@@ -24,7 +24,7 @@ known_hosts
 *.csr
 *.srl
 certs/
-quanseq/certs/
+quansec/certs/
 
 # ── Node / Next.js ───────────────────────────────────────────────────────────
 node_modules/
@@ -36,7 +36,7 @@ out/
 # Each of these carries its own .git, so `git add -A` would stage them as
 # gitlinks — submodule stubs with no .gitmodules, which clone as empty
 # directories. They are separate repositories and are versioned there.
-quanseq-pqc-platform/
+quansec-pqc-platform/
 TLS-SMOAD-HSC/
 
 # ── Claude Code local state ──────────────────────────────────────────────────
@@ -54,7 +54,7 @@ TLS-SMOAD-HSC/
 # Ignore ad-hoc dumps and scratch SQL, but the schema migrations are source
 # code — the documented setup depends on them being in the repository.
 *.sql
-!quanseq/migrations/*.sql
+!quansec/migrations/*.sql
 
 # ── OS ───────────────────────────────────────────────────────────────────────
 .DS_Store

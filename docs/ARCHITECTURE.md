@@ -5,7 +5,7 @@
 > [CONTAINERS.md](CONTAINERS.md) for the runtime/privilege boundaries. The API
 > no longer owns collector lifecycle tasks.
 
-How QUANSEQ is put together, why the boundaries sit where they do, and what
+How QUANSEC is put together, why the boundaries sit where they do, and what
 happens on every request and every collector tick.
 
 - [1. Design principles](#1-design-principles)
@@ -164,7 +164,7 @@ GET  /api/<name>/policies/compare  classical vs PQC comparison table
 1. Look up the named policy; 400 on unknown name.
 2. Detect whether the real daemon is present (`os.path.isdir("/etc/swanctl")`,
    `os.path.exists(PQC_SSHD_CONFIG)`).
-3. **Dev mode** — write to `/tmp/quanseq/…`, log a warning, set `dev_mode: true`.
+3. **Dev mode** — write to `/tmp/quansec/…`, log a warning, set `dev_mode: true`.
    **Production** — write the real config, validate it, reload the daemon.
 4. Insert an `audit_events` row with severity `warning`.
 5. Return `{status, policy, pqc_enabled, dev_mode, message}`.
@@ -268,7 +268,7 @@ every IPSEC_POLL_INTERVAL seconds
   mark_stale_tunnels_down()               rows not seen and last_seen > 30 s ago
   │                                       → state='DOWN' + ipsec_events row
   │
-  publish_summary()                       Redis PUBLISH quanseq:live
+  publish_summary()                       Redis PUBLISH quansec:live
 ```
 
 `ENSURE_UNIQUE` runs a `DO $$ … $$` block before every upsert batch to guarantee
@@ -308,7 +308,7 @@ every 5 s
   │                       keep rows where local or peer port ∈ {22, 2222}
   │                       tag each with which port matched
   │
-  _live_kex_by_peer()     journalctl -u ssh -u sshd -u quanseq-pqc-sshd.service --since -10min
+  _live_kex_by_peer()     journalctl -u ssh -u sshd -u quansec-pqc-sshd.service --since -10min
   │                       track "Connection from <ip> port <n>"
   │                       then "kex: algorithm: <name>"  → map peer → KEX
   │                       (requires sshd LogLevel DEBUG1)
@@ -336,7 +336,7 @@ tier is strictly less authoritative than the one above it.
 ```
 every 8 s
   _fetch_log_text()       local /var/log/auth.log
-  │                       or, if QUANSEQ_ZT_REMOTE is set, over the PQC ssh:
+  │                       or, if QUANSEC_ZT_REMOTE is set, over the PQC ssh:
   │                       /opt/openssh-pqc/bin/ssh -i KEY -o CertificateFile=CERT
   │                            -p 2222 host "sudo tail -n 400 /var/log/auth.log"
   │
@@ -380,7 +380,7 @@ table scan.
 
 ```
 collector / event listener
-        │  PUBLISH quanseq:live {"protocol":"ipsec","kind":"lifecycle",…}
+        │  PUBLISH quansec:live {"protocol":"ipsec","kind":"lifecycle",…}
         ▼
      Redis
         │  SUBSCRIBE
@@ -438,7 +438,7 @@ src/
 │       ├── layout.tsx              auth guard + SSH sidebar
 │       └── {page,sessions,policy,zero-trust,certificates,readiness,alerts,…}
 ├── lib/
-│   ├── api.ts                      QuanseqClient — typed methods, token handling
+│   ├── api.ts                      QuansecClient — typed methods, token handling
 │   ├── auth-context.tsx            React context: user, loading, login, logout
 │   └── use-live-stats.ts           polling + WebSocket hook
 └── components/
@@ -451,7 +451,7 @@ src/
 module's login when there is no user. Every page under that layout inherits the
 guard — a new page cannot forget it.
 
-**One client, one token.** `QuanseqClient` holds the JWT in memory and mirrors it
+**One client, one token.** `QuansecClient` holds the JWT in memory and mirrors it
 to `localStorage` so a refresh survives. Every request goes through one private
 `request<T>()` that attaches `Authorization: Bearer` and throws on non-2xx.
 
@@ -474,12 +474,12 @@ immediately, so a rekey appears without waiting for the next tick.
 |---|---|---|
 | StrongSwan down / VICI missing | Warning per cycle, cycle skipped, existing rows age out to `DOWN` after 30 s | Backend log; tunnels go DOWN in UI |
 | journald unreadable | SSH KEX falls back to port-implied, then to configured | `kex_algorithm` reflects policy, not negotiation |
-| Redis down | Collectors log and continue; no `quanseq:live` publishes | WebSocket badge disconnects; UI polls at 5 s |
+| Redis down | Collectors log and continue; no `quansec:live` publishes | WebSocket badge disconnects; UI polls at 5 s |
 | PostgreSQL down | Collectors error and retry; `/health` returns `degraded` | `/health`; API 500s |
 | A collector task dies | Task disappears from `/health.collectors` | `/health` |
 | Backend unreachable | `useLiveStats` swallows the error | Stale data, no crash |
-| No `/etc/swanctl` | Policy engine enters dev mode, writes `/tmp/quanseq/swanctl/swanctl.conf` | `dev_mode: true` in the response |
-| No PQC sshd | Same, writes `/tmp/quanseq/sshd/sshd_config` | `dev_mode: true` |
+| No `/etc/swanctl` | Policy engine enters dev mode, writes `/tmp/quansec/swanctl/swanctl.conf` | `dev_mode: true` in the response |
+| No PQC sshd | Same, writes `/tmp/quansec/sshd/sshd_config` | `dev_mode: true` |
 | Non-root backend | `PermissionError` → HTTP 500 with a remediation message | Policy apply fails loudly |
 
 ---

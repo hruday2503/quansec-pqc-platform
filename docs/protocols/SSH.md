@@ -140,7 +140,7 @@ order, and the module always reports which one it used.
 
 | Priority | Source | Command | Proves | Fails when |
 |---|---|---|---|---|
-| **1** | journald | `journalctl -u ssh -u sshd -u quanseq-pqc-sshd.service --since -10min` | What was **actually negotiated** | `LogLevel DEBUG1` unset, journald unreadable, entry aged out |
+| **1** | journald | `journalctl -u ssh -u sshd -u quansec-pqc-sshd.service --since -10min` | What was **actually negotiated** | `LogLevel DEBUG1` unset, journald unreadable, entry aged out |
 | **2** | Port map | — | What that listener **enforces** | Only for known ports (22, 2222) |
 | **3** | `sshd -T` | `sshd -T \| grep kexalgorithms` | What the daemon **offers** | Never fails; weakest claim |
 
@@ -165,7 +165,7 @@ This is the only tier that is *evidence*. The other two are *policy*.
 ### 4.2 Tier 2 — the port map
 
 ```python
-SSH_PORT_KEX = {"2222": "mlkem768x25519-sha256",   # QUANSEQ PQC sshd
+SSH_PORT_KEX = {"2222": "mlkem768x25519-sha256",   # QUANSEC PQC sshd
                 "22":   "curve25519-sha256"}       # system sshd
 ```
 
@@ -251,7 +251,7 @@ POST /api/ssh/policies/apply   {"policy_name": "pqc-hybrid"}   [admin]
 ```
 
 **Dev mode** (no `/opt/openssh-pqc/etc/sshd_config`): writes a simulated config to
-`/tmp/quanseq/sshd/sshd_config`, returns `dev_mode: true`.
+`/tmp/quansec/sshd/sshd_config`, returns `dev_mode: true`.
 
 **Production**, in order:
 
@@ -306,19 +306,19 @@ was there before.
 |---|---|---|
 | Provisioning | Copy a key to every server | Sign once; every server trusts the CA |
 | Expiry | None — keys live forever | Built-in `valid_after` / `valid_before` |
-| Identity | A key blob | A named identity (`alice@quanseq.io`) |
+| Identity | A key blob | A named identity (`alice@quansec.io`) |
 | Scope | All-or-nothing | Principals, source restrictions, forced commands |
 | Revocation | Edit every server | One KRL by serial |
 | Audit | "some key authenticated" | Identity + serial + CA fingerprint, logged |
 
-The server-side cost is one line: `TrustedUserCAKeys /opt/openssh-pqc/etc/quanseq_ca.pub`.
+The server-side cost is one line: `TrustedUserCAKeys /opt/openssh-pqc/etc/quansec_ca.pub`.
 
 ### 7.2 The issuance flow
 
 ```
 1. User generates a keypair locally      ssh-keygen -t ed25519 -f ~/.ssh/alice
 2. User submits the PUBLIC key           POST /api/ssh/ca/issue          [admin]
-3. QUANSEQ signs it                      ssh-keygen -s <CA> -I <identity>
+3. QUANSEC signs it                      ssh-keygen -s <CA> -I <identity>
                                              -n <principals> -V -1h:+8h -z <serial>
 4. User pairs cert with private key      ssh -i alice -o CertificateFile=alice-cert.pub
 ```
@@ -370,7 +370,7 @@ ssh command to use it.
   which ignores the `-1h` backdate — the recorded expiry is up to an hour later
   than the certificate's actual `valid_before`. Cosmetic in the audit view, but
   do not treat `issued_certs.expires_at` as authoritative.
-- The CA private key sits unencrypted on disk at `QUANSEQ_CA_KEY`. An HSM or at
+- The CA private key sits unencrypted on disk at `QUANSEC_CA_KEY`. An HSM or at
   minimum a passphrase with an agent is the production answer.
 
 ---
@@ -435,7 +435,7 @@ before parsing, so the collector's own `sudo tail` does not appear in its output
 
 ### 8.3 Remote log collection
 
-When QUANSEQ runs on VM A but authentications happen on VM B, the collector pulls
+When QUANSEC runs on VM A but authentications happen on VM B, the collector pulls
 the log across the PQC channel:
 
 ```python
@@ -445,7 +445,7 @@ the log across the PQC channel:
  ZT_REMOTE, "sudo tail -n 400 /var/log/auth.log"]
 ```
 
-Configured via `QUANSEQ_ZT_REMOTE`, `QUANSEQ_ZT_KEY`, `QUANSEQ_ZT_CERT`. The
+Configured via `QUANSEC_ZT_REMOTE`, `QUANSEC_ZT_KEY`, `QUANSEC_ZT_CERT`. The
 audit channel is itself post-quantum and certificate-authenticated.
 
 `StrictHostKeyChecking=no` accepts any host key — acceptable on a lab LAN,
@@ -595,9 +595,9 @@ Full schema and the runtime-vs-migration divergence:
 | Policy apply → 500 "sshd restart failed" | The daemon is now down. Restart manually: `bash vm-b/scripts/start-pqc-ssh.sh`. |
 | Certificate rejected as expired immediately | Clock skew beyond the 1-hour backdate. Sync NTP on both hosts. |
 | Certificate rejected: "principal" | The `-n` principals do not include the login user. Reissue with the right principal. |
-| No ZT events | Wrong log path, or authentications happen on another host. Set `QUANSEQ_ZT_LOG` or `QUANSEQ_ZT_REMOTE`. |
+| No ZT events | Wrong log path, or authentications happen on another host. Set `QUANSEC_ZT_LOG` or `QUANSEC_ZT_REMOTE`. |
 | ZT events show `source_ip: "unknown"` | PID correlation failed on a standalone rejection — the log format differs from the expected `sshd-session[PID]` shape. |
-| `ca_info` → 500 "CA not available" | `QUANSEQ_CA_KEY` path wrong, or the `.pub` is unreadable. |
+| `ca_info` → 500 "CA not available" | `QUANSEC_CA_KEY` path wrong, or the `.pub` is unreadable. |
 
 ---
 

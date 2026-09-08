@@ -1,6 +1,6 @@
 <div align="center">
 
-# QUANSEQ
+# QUANSEC
 
 **Post-Quantum Cryptography Management Platform**
 
@@ -15,7 +15,7 @@ across IPsec, SSH and TLS.
 
 ## Table of contents
 
-1. [What QUANSEQ is](#1-what-quanseq-is)
+1. [What QUANSEC is](#1-what-quansec-is)
 2. [The problem it solves](#2-the-problem-it-solves)
 3. [System architecture](#3-system-architecture)
 4. [Repository layout](#4-repository-layout)
@@ -28,9 +28,9 @@ across IPsec, SSH and TLS.
 
 ---
 
-## 1. What QUANSEQ is
+## 1. What QUANSEC is
 
-QUANSEQ is a control plane for post-quantum cryptography (PQC) migration.
+QUANSEC is a control plane for post-quantum cryptography (PQC) migration.
 
 It does four things, continuously, against **live** cryptographic daemons — not
 against a simulation:
@@ -72,7 +72,7 @@ running.
 The hard part of migration is not choosing an algorithm — it is *knowing what
 your estate actually negotiates*. A config file that lists `mlkem1024` proves
 nothing; the peer may have downgraded, the plugin may not have loaded, a
-fallback proposal may have won. QUANSEQ closes that gap by reading negotiated
+fallback proposal may have won. QUANSEC closes that gap by reading negotiated
 state out of the running daemons and alerting the moment a session goes
 classical.
 
@@ -80,7 +80,7 @@ classical.
 
 ## 3. System architecture
 
-QUANSEQ is a three-tier system with a strict rule: **the API never talks to a
+QUANSEC is a three-tier system with a strict rule: **the API never talks to a
 cryptographic daemon during a request.** Collectors own that boundary.
 
 ```
@@ -119,7 +119,7 @@ cryptographic daemon during a request.** Collectors own that boundary.
    ┌────────▼─────────┐  ┌──────────────┐    ┌──────────▼──────────────────┐
    │  PostgreSQL 14+  │  │  Redis 6+    │    │  DATA PLANE (the real thing)│
    │  system of record│  │  pub/sub bus │    │                             │
-   │  tunnels·sessions│  │ quanseq:live │    │  StrongSwan charon          │
+   │  tunnels·sessions│  │ quansec:live │    │  StrongSwan charon          │
    │  events·audit·ZT │  └──────────────┘    │   └ ml-kem plugin (liboqs)  │
    │  users·API keys  │                      │   └ VICI unix socket        │
    └──────────────────┘                      │                             │
@@ -127,7 +127,7 @@ cryptographic daemon during a request.** Collectors own that boundary.
                                              │   └ mlkem768x25519-sha256   │
                                              │   └ CA-signed certs only    │
                                              │                             │
-                                             │  QUANSEQ TLS service :8443  │
+                                             │  QUANSEC TLS service :8443  │
                                              │   └ separate process        │
                                              │   └ TLS 1.3 only, mTLS      │
                                              │   └ hybrid NOT enforced     │
@@ -149,7 +149,7 @@ normalise_sa()                 flattens IKE_SA + CHILD_SAs, classifies PQC
 upsert_tunnels()               protocols/ipsec/collector.py → PostgreSQL
    │
    ├─► PostgreSQL  ──► REST GET /api/ipsec/tunnels ──► portal table
-   └─► Redis PUBLISH quanseq:live ──► WS /api/ws/live ──► portal live badge
+   └─► Redis PUBLISH quansec:live ──► WS /api/ws/live ──► portal live badge
 ```
 
 The SSH path is identical in shape (`ss` + journald → `ssh_connections` → REST +
@@ -159,7 +159,7 @@ rules and the UI patterns are reused verbatim.
 
 TLS follows the same contract with one difference in where the telemetry comes
 from: instead of reading a daemon's state, the collector performs a real TLS 1.3
-handshake against QUANSEQ's own TLS service and records what the socket
+handshake against QUANSEC's own TLS service and records what the socket
 reported.
 
 Full detail: **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**
@@ -171,7 +171,7 @@ Phase 1 container deployment: **[docs/CONTAINERS.md](docs/CONTAINERS.md)**
 ## 4. Repository layout
 
 ```
-quanseq-pqc-platform/
+quansec-pqc-platform/
 ├── README.md                  ← you are here
 ├── docs/                      ← full documentation set
 │   ├── ARCHITECTURE.md            layering, module contract, data flows
@@ -186,7 +186,7 @@ quanseq-pqc-platform/
 │       ├── SSH.md                 SSH module, deep
 │       └── TLS.md                 TLS module, deep
 │
-├── quanseq/                   ← backend (FastAPI). Run uvicorn from HERE.
+├── quansec/                   ← backend (FastAPI). Run uvicorn from HERE.
 │   ├── main.py                    app factory, lifespan, router mounting
 │   ├── core/                      config · database · auth · redis_client
 │   ├── protocols/                 one package per protocol + cross-cutting
@@ -200,7 +200,7 @@ quanseq-pqc-platform/
 │   ├── setup_phase1.sh            StrongSwan + system dependency install
 │   └── launch_ns_tunnel.sh        single-host netns tunnel lab
 │
-├── quanseq-ui/                ← frontend (Next.js 16 App Router)
+├── quansec-ui/                ← frontend (Next.js 16 App Router)
 │   └── src/
 │       ├── app/portal/*           IPsec portal pages
 │       ├── app/ssh-portal/*       SSH portal pages
@@ -265,7 +265,7 @@ merely folder-organised.
 ### Backend
 
 ```bash
-cd quanseq
+cd quansec
 
 # Provisions PostgreSQL + Redis, creates .venv, installs deps,
 # writes .env, runs migrations, seeds the admin user.
@@ -277,7 +277,7 @@ uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 `main.py` imports as `core.*` and `protocols.*`, so **uvicorn must be started
-from inside `quanseq/`**. Running it from the repository root fails on import.
+from inside `quansec/`**. Running it from the repository root fails on import.
 
 Verify:
 
@@ -292,14 +292,14 @@ Interactive API docs: <http://localhost:8000/docs>
 ### Frontend
 
 ```bash
-cd quanseq-ui
+cd quansec-ui
 npm install
-echo "NEXT_PUBLIC_QUANSEQ_API=http://localhost:8000" > .env.local
+echo "NEXT_PUBLIC_QUANSEC_API=http://localhost:8000" > .env.local
 npm run dev
 ```
 
 Open <http://localhost:3000> and pick a protocol module. Default credentials are
-printed by `setup_backend.sh` (`admin@quanseq.io`); change them before any
+printed by `setup_backend.sh` (`admin@quansec.io`); change them before any
 non-lab use.
 
 ### Data plane (optional, but this is the point of the platform)
@@ -325,7 +325,7 @@ is in **[docs/TECHNOLOGY-CHOICES.md](docs/TECHNOLOGY-CHOICES.md)**.
 | **FastAPI** | Collectors are long-lived `asyncio` tasks living in the same process as the API. FastAPI's `lifespan` context manager owns their start/stop as a first-class concept. Django/Flask would need Celery or a separate supervisor for the same result. Pydantic response models also generate the OpenAPI schema the portal's typed client is written against. |
 | **asyncpg (not an ORM)** | The write path is a single `INSERT … ON CONFLICT DO UPDATE` executed every 5 s per tunnel, and the read path is aggregate SQL (`COUNT(*) FILTER (WHERE pqc_enabled)`). An ORM adds object mapping to queries that never manipulate objects. asyncpg is also the fastest Python driver and is natively async, so a collector never blocks the event loop. |
 | **PostgreSQL** | Needs `JSONB` for heterogeneous lifecycle event payloads, `TEXT[]` for cert principals and KEX allow-lists, partial indexes, `TIMESTAMPTZ`, and real `ON CONFLICT` upsert semantics. SQLite has none of the first four and would serialise writes against five concurrent collectors. |
-| **Redis** | Used strictly as a pub/sub bus on channel `quanseq:live`, not as a cache of record. It decouples collectors (publishers) from WebSocket clients (subscribers) and lets the API scale to multiple uvicorn workers without collectors needing to know about sockets. If Redis is down, collectors degrade to DB-only and the UI falls back to 5 s polling. |
+| **Redis** | Used strictly as a pub/sub bus on channel `quansec:live`, not as a cache of record. It decouples collectors (publishers) from WebSocket clients (subscribers) and lets the API scale to multiple uvicorn workers without collectors needing to know about sockets. If Redis is down, collectors degrade to DB-only and the UI falls back to 5 s polling. |
 | **StrongSwan + custom `ml-kem` plugin** | StrongSwan is the only production IKEv2 daemon with a VICI control socket that exposes *negotiated* SA parameters — the single fact the whole platform is built on. Upstream ML-KEM support was not available for the target release, so `compiled-backup/ml_kem_source/` implements a plugin registering ML-KEM-768 and ML-KEM-1024 as IKE key-exchange methods `1050`/`1051` backed by **liboqs**. |
 | **Pure ML-KEM for IPsec, hybrid for SSH** | Deliberate, not inconsistent. IPsec uses pure `mlkem1024` (NIST Level 5) to demonstrate a CNSA 2.0 end-state and prove the plugin negotiates standalone. SSH uses hybrid `mlkem768x25519-sha256` because that is what OpenSSH ships and what the IETF hybrid drafts specify — if either half breaks, the other still protects the session. |
 | **OpenSSH on port 2222** | The PQC build lives at `/opt/openssh-pqc` on a non-standard port so the system sshd on :22 keeps working. That also gives a live A/B: port 22 is the classical control, port 2222 the PQC treatment, and the collector maps port → expected KEX. |
@@ -341,7 +341,7 @@ is in **[docs/TECHNOLOGY-CHOICES.md](docs/TECHNOLOGY-CHOICES.md)**.
 | | IPsec | SSH | TLS |
 |---|---|---|---|
 | **Status** | Live | Live | Live — transport real, hybrid **not enforced** |
-| **Daemon** | StrongSwan `charon` | OpenSSH PQC `/opt/openssh-pqc` :2222 | QUANSEQ TLS service :8443 (separate process) |
+| **Daemon** | StrongSwan `charon` | OpenSSH PQC `/opt/openssh-pqc` :2222 | QUANSEC TLS service :8443 (separate process) |
 | **KEM** | ML-KEM-1024 (pure) | ML-KEM-768 + X25519 (hybrid) | X25519MLKEM768 requested, not enforced |
 | **NIST level** | Level 5 (FIPS 203) | Level 3 (FIPS 203) | Level 3 (where the runtime provides it) |
 | **CNSA 2.0 deadline** | 2033 | 2030 | 2030 |
@@ -426,7 +426,7 @@ useful.
 | **Fail-mode persistence** | Current mode lives in the in-memory `_CURRENT` dict in `protocols/failmode/router.py` and resets to `fail-closed` on restart. The `fail_mode_policies` table exists but is not read. |
 | **Redis client duplication** | `core/redis_client.py` provides a managed singleton with graceful degradation, but the IPsec collector, event listener and WebSocket endpoint each construct their own `aioredis` client. `close_redis()` is never called on shutdown. |
 | **`/metrics` is unauthenticated** | Intentional — Prometheus scrapers do not carry bearer tokens — but it must be restricted at the network layer. See [SECURITY.md](docs/SECURITY.md). |
-| **Policy engines need privilege** | Writing `/etc/swanctl/swanctl.conf` and restarting sshd requires root or scoped `sudoers` rules. Without them both engines fall back to **dev mode**, writing to `/tmp/quanseq/` and returning `dev_mode: true` instead of failing. |
+| **Policy engines need privilege** | Writing `/etc/swanctl/swanctl.conf` and restarting sshd requires root or scoped `sudoers` rules. Without them both engines fall back to **dev mode**, writing to `/tmp/quansec/` and returning `dev_mode: true` instead of failing. |
 
 ---
 

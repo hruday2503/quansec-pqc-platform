@@ -14,7 +14,7 @@ session visible in the dashboard.
 - [3. Frontend](#3-frontend)
 - [4. IPsec data plane — StrongSwan with ML-KEM](#4-ipsec-data-plane--strongswan-with-ml-kem)
 - [5. SSH data plane — OpenSSH with PQC key exchange](#5-ssh-data-plane--openssh-with-pqc-key-exchange)
-- [5b. TLS data plane — the QUANSEQ TLS service](#5b-tls-data-plane--the-quanseq-tls-service)
+- [5b. TLS data plane — the QUANSEC TLS service](#5b-tls-data-plane--the-quansec-tls-service)
 - [6. Zero Trust — the certificate authority](#6-zero-trust--the-certificate-authority)
 - [7. Two-VM lab topology](#7-two-vm-lab-topology)
 - [8. Single-host alternative — network namespaces](#8-single-host-alternative--network-namespaces)
@@ -63,8 +63,8 @@ node --version    # v20.x or later
 Clone:
 
 ```bash
-git clone https://github.com/hruday2503/quanseq-pqc-platform.git
-cd quanseq-pqc-platform
+git clone https://github.com/hruday2503/quansec-pqc-platform.git
+cd quansec-pqc-platform
 ```
 
 ---
@@ -73,11 +73,11 @@ cd quanseq-pqc-platform
 
 ### 2.1 The one-shot script
 
-`quanseq/setup_backend.sh` performs the entire backend bring-up. Read it before
+`quansec/setup_backend.sh` performs the entire backend bring-up. Read it before
 running it — it installs packages, creates a database role, and writes `.env`.
 
 ```bash
-cd quanseq
+cd quansec
 chmod +x setup_backend.sh
 ./setup_backend.sh
 ```
@@ -88,12 +88,12 @@ Nine steps, in order:
 |---|---|
 | 1 | Verifies (installs if absent) PostgreSQL, Redis, Python 3 |
 | 2 | Starts both services, waits for `pg_isready` and a Redis `PONG` |
-| 3 | Creates role `quanseq_user` and database `quanseq_db`, grants schema privileges, verifies the connection |
+| 3 | Creates role `quansec_user` and database `quansec_db`, grants schema privileges, verifies the connection |
 | 4 | Writes `.env` if absent, generating `JWT_SECRET` with `secrets.token_hex(32)`. An existing `.env` is preserved. |
 | 5 | Creates `.venv` |
 | 6 | `pip install -r requirements.txt` |
 | 7 | Applies `migrations/*.sql` in `ls -1v` order via `psql` |
-| 8 | Runs `seed_admin.py` to create/reset `admin@quanseq.io` |
+| 8 | Runs `seed_admin.py` to create/reset `admin@quansec.io` |
 | 9 | Lists created tables and sets a Redis verification key |
 
 It ends by printing the database details and admin credentials.
@@ -119,7 +119,7 @@ $EDITOR .env
 
 # Migrations run automatically on startup, but you can pre-apply them:
 for f in migrations/*.sql; do
-    PGPASSWORD=quanseq_secret psql -h localhost -U quanseq_user -d quanseq_db -f "$f"
+    PGPASSWORD=quansec_secret psql -h localhost -U quansec_user -d quansec_db -f "$f"
 done
 
 # Admin user
@@ -133,7 +133,7 @@ Every variable has a default in `core/config.py`, so the app boots with no `.env
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `DATABASE_URL` | `postgresql://quanseq_user:CHANGE_ME@localhost:5432/quanseq` | asyncpg DSN |
+| `DATABASE_URL` | `postgresql://quansec_user:CHANGE_ME@localhost:5432/quansec` | asyncpg DSN |
 | `REDIS_URL` | `redis://localhost:6379` | Pub/sub bus |
 | `JWT_SECRET` | `change-this-in-production` | **Must be changed.** HS256 signing key |
 | `JWT_ALGORITHM` | `HS256` | |
@@ -143,18 +143,18 @@ Every variable has a default in `core/config.py`, so the app boots with no `.env
 | `SSH_AUTH_LOG` | `/var/log/auth.log` | |
 | `SSHD_CONFIG` | `/etc/ssh/sshd_config` | Fallback KEX source |
 | `SSH_POLL_INTERVAL` | `5` | Declared in config; the SSH collector uses its own `POLL_INTERVAL = 5` |
-| `QUANSEQ_TLS_ENABLED` | `true` | `false` makes every TLS route return 503 |
-| `QUANSEQ_TLS_HOST`, `QUANSEQ_TLS_PORT` | `127.0.0.1`, `8443` | Where the backend connects as a TLS client |
-| `QUANSEQ_TLS_BIND_HOST` | `127.0.0.1` | Service process only. `0.0.0.0` for two machines |
-| `QUANSEQ_TLS_SERVER_HOSTNAME` | `localhost` | Must appear in the server certificate SAN |
-| `QUANSEQ_TLS_CERT_DIR` | `~/quanseq-certs` | Development PKI. Keep **outside** the repository |
-| `QUANSEQ_TLS_MTLS` | `false` | Require a client certificate signed by the same CA |
-| `QUANSEQ_TLS_TIMEOUT`, `QUANSEQ_TLS_HANDSHAKE_TIMEOUT` | `10`, `5` | Client socket / per-connection handshake cap |
-| `QUANSEQ_TLS_REQUIRE_HYBRID` | `false` | Gates startup on a runtime that *has* the hybrid group. Does **not** enforce it |
-| `QUANSEQ_TLS_HYBRID_GROUP` | `X25519MLKEM768` | The group requested, never proof it was used |
-| `QUANSEQ_TLS_OPENSSL_BIN` | `openssl` | Used for capability probes and group verification |
-| `QUANSEQ_TLS_LOG_PAYLOADS` | `false` | Logs message bodies in cleartext. Local debugging only |
-| `QUANSEQ_TLS_POLL_INTERVAL` | `30` | Seconds between TLS handshake observations |
+| `QUANSEC_TLS_ENABLED` | `true` | `false` makes every TLS route return 503 |
+| `QUANSEC_TLS_HOST`, `QUANSEC_TLS_PORT` | `127.0.0.1`, `8443` | Where the backend connects as a TLS client |
+| `QUANSEC_TLS_BIND_HOST` | `127.0.0.1` | Service process only. `0.0.0.0` for two machines |
+| `QUANSEC_TLS_SERVER_HOSTNAME` | `localhost` | Must appear in the server certificate SAN |
+| `QUANSEC_TLS_CERT_DIR` | `~/quansec-certs` | Development PKI. Keep **outside** the repository |
+| `QUANSEC_TLS_MTLS` | `false` | Require a client certificate signed by the same CA |
+| `QUANSEC_TLS_TIMEOUT`, `QUANSEC_TLS_HANDSHAKE_TIMEOUT` | `10`, `5` | Client socket / per-connection handshake cap |
+| `QUANSEC_TLS_REQUIRE_HYBRID` | `false` | Gates startup on a runtime that *has* the hybrid group. Does **not** enforce it |
+| `QUANSEC_TLS_HYBRID_GROUP` | `X25519MLKEM768` | The group requested, never proof it was used |
+| `QUANSEC_TLS_OPENSSL_BIN` | `openssl` | Used for capability probes and group verification |
+| `QUANSEC_TLS_LOG_PAYLOADS` | `false` | Logs message bodies in cleartext. Local debugging only |
+| `QUANSEC_TLS_POLL_INTERVAL` | `30` | Seconds between TLS handshake observations |
 | `NGINX_ACCESS_LOG` | | Reserved for a future collector that tails nginx TLS logs |
 | `WG_INTERFACE`, `VPN_POLL_INTERVAL` | | Reserved for the VPN module |
 
@@ -162,16 +162,16 @@ Read directly from the environment rather than `Settings`:
 
 | Variable | Read by | Purpose |
 |---|---|---|
-| `QUANSEQ_CA_KEY` | `protocols/ssh/ca.py` | CA private key path (default `~/quanseq-ca/quanseq_ca`) |
-| `QUANSEQ_ZT_LOG` | `protocols/ssh/ztaudit.py` | Auth log to parse |
-| `QUANSEQ_ZT_REMOTE` | `protocols/ssh/ztaudit.py` | `user@host` to pull the log from over PQC ssh |
-| `QUANSEQ_ZT_KEY`, `QUANSEQ_ZT_CERT` | `protocols/ssh/ztaudit.py` | Credentials for that pull |
+| `QUANSEC_CA_KEY` | `protocols/ssh/ca.py` | CA private key path (default `~/quansec-ca/quansec_ca`) |
+| `QUANSEC_ZT_LOG` | `protocols/ssh/ztaudit.py` | Auth log to parse |
+| `QUANSEC_ZT_REMOTE` | `protocols/ssh/ztaudit.py` | `user@host` to pull the log from over PQC ssh |
+| `QUANSEC_ZT_KEY`, `QUANSEC_ZT_CERT` | `protocols/ssh/ztaudit.py` | Credentials for that pull |
 | `ADMIN_PASSWORD` | `seed_admin.py` | Seeded admin password |
 
 ### 2.4 Run
 
 ```bash
-cd quanseq              # ← required: imports are core.*, protocols.*
+cd quansec              # ← required: imports are core.*, protocols.*
 source .venv/bin/activate
 uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 ```
@@ -179,7 +179,7 @@ uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 Expected startup log:
 
 ```
-QUANSEQ starting up...
+QUANSEC starting up...
 Running migration: 001_users.sql
 … 006_metrics_scoring.sql
 Database ready
@@ -198,7 +198,7 @@ uvicorn main:app --host 0.0.0.0 --port 8000 --workers 1
 ```
 
 **One worker only.** Each worker would run its own copy of all five collectors,
-producing duplicate writes and duplicate `quanseq:live` publishes. Scaling
+producing duplicate writes and duplicate `quansec:live` publishes. Scaling
 horizontally requires splitting collectors into a separate process first — see
 [OPERATIONS.md](OPERATIONS.md#scaling).
 
@@ -207,9 +207,9 @@ horizontally requires splitting collectors into a separate process first — see
 ## 3. Frontend
 
 ```bash
-cd quanseq-ui
+cd quansec-ui
 npm install
-echo "NEXT_PUBLIC_QUANSEQ_API=http://localhost:8000" > .env.local
+echo "NEXT_PUBLIC_QUANSEC_API=http://localhost:8000" > .env.local
 npm run dev
 ```
 
@@ -222,7 +222,7 @@ npm run build
 npm run start          # defaults to port 3000
 ```
 
-`NEXT_PUBLIC_QUANSEQ_API` is inlined at **build** time. Changing it after
+`NEXT_PUBLIC_QUANSEC_API` is inlined at **build** time. Changing it after
 `npm run build` requires a rebuild.
 
 **CORS.** `main.py` allows only `http://localhost:3000` and
@@ -240,7 +240,7 @@ registers ML-KEM-768 and ML-KEM-1024 as IKE key-exchange methods backed by
 
 ### 4.1 What the plugin does
 
-`quanseq/compiled-backup/ml_kem_source/` contains:
+`quansec/compiled-backup/ml_kem_source/` contains:
 
 | File | Role |
 |---|---|
@@ -281,7 +281,7 @@ cmake -GNinja -DCMAKE_INSTALL_PREFIX=/usr/local -DBUILD_SHARED_LIBS=ON ..
 ninja && sudo ninja install
 
 # Make the runtime linker aware of /usr/local/lib
-sudo cp ~/quanseq-pqc-platform/quanseq/strongswan-configs/liboqs.conf \
+sudo cp ~/quansec-pqc-platform/quansec/strongswan-configs/liboqs.conf \
         /etc/ld.so.conf.d/liboqs.conf
 sudo ldconfig
 ldconfig -p | grep liboqs      # must print liboqs.so
@@ -297,7 +297,7 @@ tar xf strongswan-5.9.14.tar.bz2
 cd strongswan-5.9.14
 
 # Drop the plugin into the source tree
-cp -r ~/quanseq-pqc-platform/quanseq/compiled-backup/ml_kem_source src/libstrongswan/plugins/ml_kem
+cp -r ~/quansec-pqc-platform/quansec/compiled-backup/ml_kem_source src/libstrongswan/plugins/ml_kem
 
 # Register it with the build system
 #   configure.ac : ARG_ENABL_SET([ml-kem], [enable the ML-KEM plugin.])
@@ -313,18 +313,18 @@ make -j$(nproc)
 sudo make install
 ```
 
-If the build is troublesome, `quanseq/compiled-backup/` also carries the
+If the build is troublesome, `quansec/compiled-backup/` also carries the
 pre-built `libstrongswan-ml-kem.so` and a matching `libstrongswan.so.0.0.0`.
 They are ABI-tied to the StrongSwan version they were built against — copying
 them onto a different build will fail to load.
 
 ### 4.4 Configure charon
 
-Three drop-ins, all provided in `quanseq/strongswan-configs/`:
+Three drop-ins, all provided in `quansec/strongswan-configs/`:
 
 ```bash
-sudo cp quanseq/strongswan-configs/ml-kem.conf       /etc/strongswan.d/charon/ml-kem.conf
-sudo cp quanseq/strongswan-configs/private-algs.conf /etc/strongswan.d/private-algs.conf
+sudo cp quansec/strongswan-configs/ml-kem.conf       /etc/strongswan.d/charon/ml-kem.conf
+sudo cp quansec/strongswan-configs/private-algs.conf /etc/strongswan.d/private-algs.conf
 ```
 
 ```
@@ -349,7 +349,7 @@ with `NO_PROPOSAL_CHOSEN`.
 
 ### 4.5 Tunnel configuration
 
-`quanseq/two-vm-configs/vm-a-swanctl.conf` (initiator) and
+`quansec/two-vm-configs/vm-a-swanctl.conf` (initiator) and
 `vm-b/swanctl/swanctl.conf` (responder) are a matched pair:
 
 ```
@@ -380,11 +380,11 @@ Notes that matter:
 
 - `proposals = aes256-sha256-mlkem1024` is a **pure** PQC key exchange — no
   `ecp384+mlkem1024` hybrid. It is the strongest possible statement and it
-  proves the plugin negotiates standalone. `quanseq/strongswan/swanctl.conf`
+  proves the plugin negotiates standalone. `quansec/strongswan/swanctl.conf`
   contains the hybrid `ecp384+mlkem1024` form (RFC 9370 additional key exchange)
   as an alternative template.
 - PSK authentication keeps the lab reproducible. Production should use
-  `auth = pubkey` with X.509 — see the template in `quanseq/strongswan/swanctl.conf`.
+  `auth = pubkey` with X.509 — see the template in `quansec/strongswan/swanctl.conf`.
   Note that authentication remains classical either way; PQC here protects key
   *establishment*, which is what harvest-now-decrypt-later attacks target.
 - `start_action = trap` on one side only. Both sides trapping causes a
@@ -396,7 +396,7 @@ Notes that matter:
 Install and load:
 
 ```bash
-sudo cp quanseq/two-vm-configs/vm-a-swanctl.conf /etc/swanctl/swanctl.conf   # on VM A
+sudo cp quansec/two-vm-configs/vm-a-swanctl.conf /etc/swanctl/swanctl.conf   # on VM A
 sudo cp vm-b/swanctl/swanctl.conf                /etc/swanctl/swanctl.conf   # on VM B
 sudo chmod 600 /etc/swanctl/swanctl.conf
 sudo swanctl --load-all
@@ -487,7 +487,7 @@ Subsystem sftp /opt/openssh-pqc/libexec/sftp-server
 PidFile /opt/openssh-pqc/var/sshd-pqc.pid
 
 # Zero Trust
-TrustedUserCAKeys /opt/openssh-pqc/etc/quanseq_ca.pub
+TrustedUserCAKeys /opt/openssh-pqc/etc/quansec_ca.pub
 PubkeyAuthentication yes
 ChallengeResponseAuthentication no
 KbdInteractiveAuthentication no
@@ -533,7 +533,7 @@ supervision. For anything beyond a demo, write a systemd unit:
 
 ```ini
 [Unit]
-Description=QUANSEQ PQC OpenSSH
+Description=QUANSEC PQC OpenSSH
 After=network.target
 [Service]
 ExecStart=/opt/openssh-pqc/sbin/sshd -D -f /opt/openssh-pqc/etc/sshd_config
@@ -544,17 +544,17 @@ WantedBy=multi-user.target
 
 ---
 
-## 5b. TLS data plane — the QUANSEQ TLS service
+## 5b. TLS data plane — the QUANSEC TLS service
 
-Unlike IPsec and SSH, there is no third-party daemon to install. QUANSEQ ships
+Unlike IPsec and SSH, there is no third-party daemon to install. QUANSEC ships
 its own TLS 1.3 service, runs it as a **separate process**, and connects to it as
 a client. That is what the TLS module measures.
 
 ### 5b.1 Generate the development PKI
 
 ```bash
-cd quanseq
-python scripts/generate_tls_certs.py --cert-dir ~/quanseq-certs
+cd quansec
+python scripts/generate_tls_certs.py --cert-dir ~/quansec-certs
 ```
 
 Creates a local root CA, a server certificate with `DNS:localhost` and
@@ -564,7 +564,7 @@ written mode 600.
 **This is development material, not production PKI** — the CA private key sits on
 disk beside the server key. Keep the directory outside the repository; the
 repo's `.gitignore` covers `*.key` and `certs/` as a backstop, but the default
-location (`~/quanseq-certs`) is outside the tree on purpose.
+location (`~/quansec-certs`) is outside the tree on purpose.
 
 There is no HTTP route for this. Generating a CA rotates the trust anchor for the
 whole module, so it requires shell access by design.
@@ -576,7 +576,7 @@ bash scripts/run_tls_service.sh            # foreground, own terminal
 ```
 
 It listens on `127.0.0.1:8443`, enforces TLS 1.3 only, and verifies client
-certificates when `QUANSEQ_TLS_MTLS=true`. The backend never starts it: a
+certificates when `QUANSEC_TLS_MTLS=true`. The backend never starts it: a
 blocking thread-per-client server does not belong beside an asyncio event loop,
 and a separate process releases its listening socket unconditionally on exit.
 
@@ -584,7 +584,7 @@ and a separate process releases its listening socket unconditionally on exit.
 
 ```bash
 openssl s_client -connect 127.0.0.1:8443 -tls1_3 \
-        -CAfile ~/quanseq-certs/ca.crt -servername localhost -brief </dev/null
+        -CAfile ~/quansec-certs/ca.crt -servername localhost -brief </dev/null
 ```
 
 Expected on stock Ubuntu 24.04:
@@ -614,10 +614,10 @@ The same PKI and the same code work across two hosts:
 ```bash
 # Peer machine: regenerate the server cert so its SAN covers the peer address
 python scripts/generate_tls_certs.py --extra-ip 192.168.1.50 --force
-QUANSEQ_TLS_BIND_HOST=0.0.0.0 bash scripts/run_tls_service.sh
+QUANSEC_TLS_BIND_HOST=0.0.0.0 bash scripts/run_tls_service.sh
 
-# QUANSEQ machine
-QUANSEQ_TLS_HOST=192.168.1.50
+# QUANSEC machine
+QUANSEC_TLS_HOST=192.168.1.50
 ```
 
 Nothing else changes.
@@ -634,19 +634,19 @@ serial-based, and every authentication is auditable.
 ### 6.1 Create the CA
 
 ```bash
-mkdir -p ~/quanseq-ca && chmod 700 ~/quanseq-ca
-ssh-keygen -t ed25519 -f ~/quanseq-ca/quanseq_ca -C "QUANSEQ CA" -N ''
-chmod 600 ~/quanseq-ca/quanseq_ca
+mkdir -p ~/quansec-ca && chmod 700 ~/quansec-ca
+ssh-keygen -t ed25519 -f ~/quansec-ca/quansec_ca -C "QUANSEC CA" -N ''
+chmod 600 ~/quansec-ca/quansec_ca
 ```
 
-The backend finds it via `QUANSEQ_CA_KEY` (default `~/quanseq-ca/quanseq_ca`).
-`.gitignore` already excludes `quanseq_ca*`, `*_key`, and `*-cert.pub`.
+The backend finds it via `QUANSEC_CA_KEY` (default `~/quansec-ca/quansec_ca`).
+`.gitignore` already excludes `quansec_ca*`, `*_key`, and `*-cert.pub`.
 
 ### 6.2 Trust it on the server
 
 ```bash
-sudo cp ~/quanseq-ca/quanseq_ca.pub /opt/openssh-pqc/etc/quanseq_ca.pub
-# sshd_config already has: TrustedUserCAKeys /opt/openssh-pqc/etc/quanseq_ca.pub
+sudo cp ~/quansec-ca/quansec_ca.pub /opt/openssh-pqc/etc/quansec_ca.pub
+# sshd_config already has: TrustedUserCAKeys /opt/openssh-pqc/etc/quansec_ca.pub
 sudo pkill -f "openssh-pqc.*2222" && bash vm-b/scripts/start-pqc-ssh.sh
 ```
 
@@ -660,13 +660,13 @@ The user generates their own key pair. **The private key never leaves them** —
 ssh-keygen -t ed25519 -f ~/.ssh/alice -N ''
 
 TOKEN=$(curl -s -X POST http://localhost:8000/api/auth/login \
-        -d "username=admin@quanseq.io&password=$ADMIN_PASSWORD" \
+        -d "username=admin@quansec.io&password=$ADMIN_PASSWORD" \
         | python3 -c "import sys,json;print(json.load(sys.stdin)['access_token'])")
 
 curl -s -X POST http://localhost:8000/api/ssh/ca/issue \
   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
   -d "{\"public_key\": \"$(cat ~/.ssh/alice.pub)\",
-       \"identity\": \"alice@quanseq.io\",
+       \"identity\": \"alice@quansec.io\",
        \"principals\": \"hd6441\",
        \"valid_hours\": 8}" | python3 -m json.tool
 ```
@@ -694,8 +694,8 @@ Certificate revocation uses an OpenSSH KRL. The platform records serials in
 generate or distribute the KRL. Until it does, revocation is manual:
 
 ```bash
-ssh-keygen -k -f /opt/openssh-pqc/etc/quanseq.krl -u -s ~/quanseq-ca/quanseq_ca.pub -z <serial>
-# add to sshd_config:  RevokedKeys /opt/openssh-pqc/etc/quanseq.krl
+ssh-keygen -k -f /opt/openssh-pqc/etc/quansec.krl -u -s ~/quansec-ca/quansec_ca.pub -z <serial>
+# add to sshd_config:  RevokedKeys /opt/openssh-pqc/etc/quansec.krl
 ```
 
 Short validity windows (default 8 h) are the primary containment mechanism.
@@ -709,14 +709,14 @@ Short validity windows (default 8 h) are the primary containment mechanism.
         │  VM A — 192.168.1.6          │        │  VM B — 192.168.1.7          │
         │  control plane + initiator   │        │  responder + PQC SSH server  │
         │                              │        │                              │
-        │  QUANSEQ backend      :8000  │        │  StrongSwan charon           │
-        │  QUANSEQ UI           :3000  │        │    swanctl.conf (id vm-b)    │
+        │  QUANSEC backend      :8000  │        │  StrongSwan charon           │
+        │  QUANSEC UI           :3000  │        │    swanctl.conf (id vm-b)    │
         │  PostgreSQL           :5432  │        │    start_action = none       │
         │  Redis                :6379  │        │                              │
         │  StrongSwan charon           │        │  OpenSSH PQC          :2222  │
         │    swanctl.conf (id vm-a)    │        │    mlkem768x25519-sha256     │
         │    start_action = trap       │        │    TrustedUserCAKeys         │
-        │  QUANSEQ CA (~/quanseq-ca)   │        │    PasswordAuthentication no │
+        │  QUANSEC CA (~/quansec-ca)   │        │    PasswordAuthentication no │
         └──────────────┬───────────────┘        └──────────────┬───────────────┘
                        │                                       │
                        └──────── IPsec ESP tunnel ─────────────┘
@@ -737,16 +737,16 @@ Setup order:
 | 6 | B | OpenSSH PQC build + config | 5 |
 | 7 | A | Create the CA, copy the public key to B | 6.1–6.2 |
 | 8 | A | Issue a cert, connect to B on 2222 | 6.3 |
-| 9 | A | Point `QUANSEQ_ZT_REMOTE` at B so the ZT collector pulls B's auth log | below |
+| 9 | A | Point `QUANSEC_ZT_REMOTE` at B so the ZT collector pulls B's auth log | below |
 
 The ZT collector runs on VM A but the certificate authentications happen on VM B.
 Pull them across the PQC channel:
 
 ```bash
-# in quanseq/.env on VM A
-QUANSEQ_ZT_REMOTE=hd6441@192.168.1.7
-QUANSEQ_ZT_KEY=/home/USER/.ssh/quanseq_zt
-QUANSEQ_ZT_CERT=/home/USER/.ssh/quanseq_zt-cert.pub
+# in quansec/.env on VM A
+QUANSEC_ZT_REMOTE=hd6441@192.168.1.7
+QUANSEC_ZT_KEY=/home/USER/.ssh/quansec_zt
+QUANSEC_ZT_CERT=/home/USER/.ssh/quansec_zt-cert.pub
 ```
 
 This requires a passwordless-sudo entry on VM B for
@@ -761,7 +761,7 @@ falls back to hardcoded `192.168.1.6/.7` if that read fails).
 
 ## 8. Single-host alternative — network namespaces
 
-`quanseq/launch_ns_tunnel.sh` runs two charon daemons on one machine in separate
+`quansec/launch_ns_tunnel.sh` runs two charon daemons on one machine in separate
 network namespaces — a real IKEv2 negotiation over a veth pair, with no second VM.
 
 Create the namespaces first (not done by the script):
@@ -783,7 +783,7 @@ sudo mkdir -p /etc/ns-left/swanctl /etc/ns-right/swanctl /var/run/ns-left /var/r
 Then:
 
 ```bash
-sudo bash quanseq/launch_ns_tunnel.sh
+sudo bash quansec/launch_ns_tunnel.sh
 sudo ip netns exec ns-left ping -c 5 10.10.0.2      # trap brings the tunnel up
 ```
 
@@ -821,8 +821,8 @@ sudo chmod 600 /etc/swanctl/swanctl.conf
 ```
 
 ```
-# /etc/sudoers.d/quanseq-ipsec   (visudo -f)
-quanseq ALL=(root) NOPASSWD: /usr/sbin/swanctl --load-all
+# /etc/sudoers.d/quansec-ipsec   (visudo -f)
+quansec ALL=(root) NOPASSWD: /usr/sbin/swanctl --load-all
 ```
 
 ### SSH
@@ -831,11 +831,11 @@ quanseq ALL=(root) NOPASSWD: /usr/sbin/swanctl --load-all
 `sudo sshd`.
 
 ```
-# /etc/sudoers.d/quanseq-ssh
-quanseq ALL=(root) NOPASSWD: /usr/bin/tee /opt/openssh-pqc/etc/sshd_config
-quanseq ALL=(root) NOPASSWD: /opt/openssh-pqc/sbin/sshd -t -f /opt/openssh-pqc/etc/sshd_config
-quanseq ALL=(root) NOPASSWD: /opt/openssh-pqc/sbin/sshd -f /opt/openssh-pqc/etc/sshd_config
-quanseq ALL=(root) NOPASSWD: /usr/bin/pkill -f /opt/openssh-pqc/sbin/sshd*
+# /etc/sudoers.d/quansec-ssh
+quansec ALL=(root) NOPASSWD: /usr/bin/tee /opt/openssh-pqc/etc/sshd_config
+quansec ALL=(root) NOPASSWD: /opt/openssh-pqc/sbin/sshd -t -f /opt/openssh-pqc/etc/sshd_config
+quansec ALL=(root) NOPASSWD: /opt/openssh-pqc/sbin/sshd -f /opt/openssh-pqc/etc/sshd_config
+quansec ALL=(root) NOPASSWD: /usr/bin/pkill -f /opt/openssh-pqc/sbin/sshd*
 ```
 
 Grant these to a dedicated service account, never to a login user. Each line is
@@ -845,7 +845,7 @@ rule in particular is only safe because the path is fixed.
 ### Reading journald
 
 ```bash
-sudo usermod -aG systemd-journal quanseq
+sudo usermod -aG systemd-journal quansec
 ```
 
 Without it, `journalctl -u ssh` returns nothing and KEX detection degrades.
@@ -861,7 +861,7 @@ curl -s localhost:8000/health | python3 -m json.tool
 
 # ── Auth ───────────────────────────────────────────────────────────────────
 TOKEN=$(curl -s -X POST localhost:8000/api/auth/login \
-        -d "username=admin@quanseq.io&password=$ADMIN_PASSWORD" \
+        -d "username=admin@quansec.io&password=$ADMIN_PASSWORD" \
         | python3 -c "import sys,json;print(json.load(sys.stdin)['access_token'])")
 curl -s localhost:8000/api/auth/me -H "Authorization: Bearer $TOKEN"
 
@@ -878,7 +878,7 @@ curl -s localhost:8000/api/ssh/stats -H "Authorization: Bearer $TOKEN"
 # ── TLS ────────────────────────────────────────────────────────────────────
 # Ground truth first — an independent tool, not our own code
 openssl s_client -connect 127.0.0.1:8443 -tls1_3 \
-        -CAfile ~/quanseq-certs/ca.crt -servername localhost -brief </dev/null
+        -CAfile ~/quansec-certs/ca.crt -servername localhost -brief </dev/null
 # expect: TLSv1.3, TLS_AES_256_GCM_SHA384, Verification: OK
 
 curl -s localhost:8000/api/tls/status -H "Authorization: Bearer $TOKEN"
@@ -895,7 +895,7 @@ curl -s localhost:8000/api/scoring/overall -H "Authorization: Bearer $TOKEN"
 # a fully PQC estate scores in the 90s with grade A
 
 # ── Telemetry ──────────────────────────────────────────────────────────────
-curl -s localhost:8000/metrics | grep quanseq_
+curl -s localhost:8000/metrics | grep quansec_
 curl -s "localhost:8000/api/siem/events?format=cef" -H "Authorization: Bearer $TOKEN"
 
 # ── Live push ──────────────────────────────────────────────────────────────
@@ -908,7 +908,7 @@ websocat ws://localhost:8000/api/ws/live        # then bounce the tunnel
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| `ModuleNotFoundError: core` | uvicorn started outside `quanseq/` | `cd quanseq` first |
+| `ModuleNotFoundError: core` | uvicorn started outside `quansec/` | `cd quansec` first |
 | `StrongSwan VICI socket not available` every 5 s | charon down, or socket unreadable | `systemctl status strongswan`; check permissions (§4.6) |
 | Tunnel `NO_PROPOSAL_CHOSEN` | ml-kem plugin not loaded, or `accept_private_algs` missing | `swanctl --stats \| grep ml-kem`; install both drop-ins (§4.4) |
 | Tunnel up but `pqc_enabled: false` | The negotiated proposal genuinely lacks a PQC KEM | `swanctl --list-sas` — if it shows `ECP_384`, the peer downgraded |
@@ -916,8 +916,8 @@ websocat ws://localhost:8000/api/ws/live        # then bounce the tunnel
 | SSH shows classical for a port-2222 session | journald read failed, fell back to configured KEX | Same as above; check `journalctl -u ssh --since -5min` |
 | Policy apply returns `dev_mode: true` | `/etc/swanctl` or the PQC sshd_config is absent | Install the daemon, or accept dev mode for a demo |
 | Policy apply → 500 "Cannot write swanctl.conf" | Backend lacks write permission | §9 |
-| WebSocket connects then goes quiet | Redis down, or nothing published yet | `redis-cli ping`; `redis-cli SUBSCRIBE quanseq:live` |
-| No Zero Trust events | Wrong log path, or authentications happen on the other VM | Set `QUANSEQ_ZT_LOG`, or `QUANSEQ_ZT_REMOTE` (§7) |
+| WebSocket connects then goes quiet | Redis down, or nothing published yet | `redis-cli ping`; `redis-cli SUBSCRIBE quansec:live` |
+| No Zero Trust events | Wrong log path, or authentications happen on the other VM | Set `QUANSEC_ZT_LOG`, or `QUANSEC_ZT_REMOTE` (§7) |
 | `/api/auth/login` → 401 with correct password | Admin never seeded, or hash mismatch | `ADMIN_PASSWORD=… python seed_admin.py` |
 | UI shows CORS errors | Origin not in `allow_origins` | Edit `main.py`, or serve on `localhost:3000` |
 | Migrations log errors on startup | Expected on re-run; all statements are idempotent | Only investigate if a table is genuinely missing |
