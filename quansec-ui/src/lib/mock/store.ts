@@ -171,19 +171,46 @@ function computeIpsecCompare(): PolicyCompare {
 }
 
 function runIpsecAttack(name: string): AttackResult {
+  const target = `${ipsecCurrentPolicy} · ${ipsecTunnels[0]?.ike_proposal ?? "no active proposal"}`;
   switch (name) {
     case "downgrade":
-      return { attack: name, result: "BLOCKED", technique: "IKE proposal stripping", detail: "Fail-closed policy rejected the connection instead of falling back to a classical proposal.", duration_ms: 812 };
+      return {
+        attack: name, result: "BLOCKED", technique: "IKE proposal stripping", target,
+        finding: "The negotiated proposal could not be forced to a classical-only fallback.",
+        detail: "Fail-closed policy rejected the connection instead of falling back to a classical proposal.",
+        duration_ms: 812, risk: "None", remediation: "No action required — fail-closed is already enforced on this policy.",
+      };
     case "shors":
-      return { attack: name, result: "RESISTANT", technique: "Quantum factoring / discrete-log attack", detail: "ML-KEM's lattice hardness assumption has no known efficient quantum algorithm.", complexity_class: "Believed BQP-hard" };
+      return {
+        attack: name, result: "RESISTANT", technique: "Quantum factoring / discrete-log attack", target,
+        finding: "No efficient quantum algorithm is known against the ML-KEM lattice problem.",
+        detail: "ML-KEM's lattice hardness assumption has no known efficient quantum algorithm.",
+        complexity_class: "Believed BQP-hard", risk: "None", remediation: "No action required.",
+      };
     case "harvest":
-      return { attack: name, result: "PROTECTED", technique: "Store-now, decrypt-later", detail: "Captured ciphertext remains computationally protected against future quantum decryption.", captured_bytes: 2_048_000 };
+      return {
+        attack: name, result: "PROTECTED", technique: "Store-now, decrypt-later", target,
+        finding: "Captured ciphertext cannot be retroactively decrypted by a future quantum computer.",
+        detail: "Captured ciphertext remains computationally protected against future quantum decryption.",
+        captured_bytes: 2_048_000, risk: "None", remediation: "No action required — this is the property ML-KEM-1024 is chosen for.",
+      };
     case "factoring":
-      return { attack: name, result: "BROKEN", technique: "Pollard rho factorization", detail: "A 512-bit classical RSA-style key factored in under a second — illustrating why classical key exchange is being retired.", key_bits: 512, factor_time_ms: 340 };
+      return {
+        attack: name, result: "BROKEN", technique: "Pollard rho factorization", target: "classical-baseline · aes256gcm16-prfsha384-ecp384 (reference)",
+        finding: "A 512-bit classical RSA-style key was fully factored.",
+        detail: "Illustrates why classical key exchange is being retired — not a property of the active policy above.",
+        key_bits: 512, factor_time_ms: 340, risk: "Critical",
+        remediation: "Apply the pqc-level5 policy platform-wide; do not operate a 512-bit classical key exchange in production.",
+      };
     case "kyber-resist":
-      return { attack: name, result: "RESISTANT", technique: "Brute-force lattice search", detail: "10,000 attempts against the ML-KEM-1024 lattice problem, all unsuccessful.", attempts: 10_000 };
+      return {
+        attack: name, result: "RESISTANT", technique: "Brute-force lattice search", target,
+        finding: "10,000 candidate keys were tried against the ML-KEM-1024 lattice problem; none succeeded.",
+        detail: "10,000 attempts against the ML-KEM-1024 lattice problem, all unsuccessful.",
+        attempts: 10_000, risk: "None", remediation: "No action required.",
+      };
     default:
-      return { attack: name, result: "RESISTANT" };
+      return { attack: name, result: "RESISTANT", target, risk: "None", remediation: "No action required." };
   }
 }
 
@@ -225,15 +252,31 @@ function computeSshStats() {
 }
 
 function runSshAttack(attackId: string) {
+  const target = `${sshCurrentPolicy} · ${sshConnections[0]?.kex_algorithm ?? "no active session"}`;
   switch (attackId) {
     case "downgrade":
-      return { attack: attackId, result: "BLOCKED", detail: "Server rejected the connection rather than negotiating a classical-only KEX.", duration_ms: 640 };
+      return {
+        attack: attackId, result: "BLOCKED", technique: "KEX proposal stripping", target,
+        finding: "The server could not be forced to negotiate a classical-only key exchange.",
+        detail: "Server rejected the connection rather than negotiating a classical-only KEX.",
+        duration_ms: 640, risk: "None", remediation: "No action required — the server already refuses classical-only offers.",
+      };
     case "shors":
-      return { attack: attackId, result: "RESISTANT", detail: "The ML-KEM-768 half of the hybrid exchange has no known efficient quantum attack." };
+      return {
+        attack: attackId, result: "RESISTANT", technique: "Quantum discrete-log attack", target,
+        finding: "No efficient quantum algorithm is known against the ML-KEM-768 half of the hybrid exchange.",
+        detail: "The ML-KEM-768 half of the hybrid exchange has no known efficient quantum attack.",
+        risk: "None", remediation: "No action required.",
+      };
     case "harvest":
-      return { attack: attackId, result: "PROTECTED", detail: "Recorded traffic stays protected even if the classical X25519 half is later broken by a quantum computer." };
+      return {
+        attack: attackId, result: "PROTECTED", technique: "Store-now, decrypt-later", target,
+        finding: "Recorded session traffic cannot be retroactively decrypted even if X25519 alone is later broken.",
+        detail: "Recorded traffic stays protected even if the classical X25519 half is later broken by a quantum computer.",
+        risk: "None", remediation: "No action required — this is the property the hybrid construction provides.",
+      };
     default:
-      return { attack: attackId, result: "RESISTANT" };
+      return { attack: attackId, result: "RESISTANT", target, risk: "None", remediation: "No action required." };
   }
 }
 
@@ -508,24 +551,6 @@ function runTlsDowngrade(kind: "hybrid" | "tls12" | "cipher"): TlsDowngradeTest 
   return test;
 }
 
-// ── Live jitter ──────────────────────────────────────────────────────────
-
-let tickStarted = false;
-function startTicking() {
-  if (tickStarted || typeof window === "undefined") return;
-  tickStarted = true;
-  setInterval(() => {
-    for (const t of ipsecTunnels) {
-      if (t.state !== "ESTABLISHED") continue;
-      t.bytes_in += Math.floor(400 + Math.random() * 4000);
-      t.bytes_out += Math.floor(400 + Math.random() * 4000);
-      t.packets_in += Math.floor(1 + Math.random() * 8);
-      t.packets_out += Math.floor(1 + Math.random() * 8);
-      t.last_seen = nowIso();
-    }
-  }, 4000);
-}
-startTicking();
 
 // ── Public store API ────────────────────────────────────────────────────
 

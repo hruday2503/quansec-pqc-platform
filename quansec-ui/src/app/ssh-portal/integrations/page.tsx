@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Panel, PanelHeader } from "@/components/ui-primitives";
+import { Panel, PanelHeader, PageHeader } from "@/components/ui-primitives";
 import { ShieldCheck, ShieldAlert, Download, Copy, Check, Radio } from "lucide-react";
 import { authHeaders as bearerHeaders } from "@/lib/auth-fetch";
 import { mockFetch } from "@/lib/mock/fetch";
@@ -76,15 +76,12 @@ export default function IntegrationsPage() {
 
   return (
     <div className="p-8 max-w-4xl mx-auto">
-      <div className="mb-8">
-        <div className="text-[11px] font-mono-display font-semibold tracking-[0.18em] uppercase mb-1.5" style={{ color: "var(--lattice-violet-dim)" }}>
-          Crypto-Agility
-        </div>
-        <h1 className="text-3xl font-extrabold tracking-tight" style={{ color: "var(--text-primary)" }}>Failure Mode & Export</h1>
-        <p className="text-sm mt-1.5" style={{ color: "var(--text-primary)" }}>
-          Configure failure behavior and export events to your SIEM
-        </p>
-      </div>
+      <PageHeader
+        eyebrow="Crypto-agility"
+        title="Failure mode & export"
+        description="Configure failure behavior and export events to your SIEM."
+        accent="var(--lattice-violet)"
+      />
 
       {/* Fail mode toggle */}
       <Panel className="mb-6">

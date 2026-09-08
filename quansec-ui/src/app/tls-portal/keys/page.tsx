@@ -2,12 +2,12 @@
 
 import { useCallback, useEffect, useState } from "react";
 import {
-  AlertTriangle, Check, Copy, KeyRound, Plus, ShieldAlert, Trash2, X, XCircle,
+  AlertTriangle, Check, Copy, KeyRound, Plus, ShieldAlert, Trash2, XCircle,
 } from "lucide-react";
 import {
   quansec, ApiKey, ApiKeyCreated, GrantableScopes, TLS_KEY_SCOPES, apiKeyState,
 } from "@/lib/api";
-import { Panel, PanelHeader } from "@/components/ui-primitives";
+import { Panel, PanelHeader, ConfirmDialog, DismissButton } from "@/components/ui-primitives";
 
 /**
  * TLS API keys.
@@ -143,7 +143,7 @@ export default function TlsKeysPage() {
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>
-            API Keys
+            API keys
           </h1>
           <p className="text-sm mt-1 max-w-2xl" style={{ color: "var(--text-secondary)" }}>
             Use an API key to authenticate your application to QUANSEC TLS
@@ -312,10 +312,7 @@ export default function TlsKeysPage() {
                   {revealed.name}
                 </span>
               </div>
-              <button onClick={() => setRevealed(null)} className="focus-ring rounded p-1"
-                      style={{ color: "var(--text-tertiary)" }}>
-                <X size={16} />
-              </button>
+              <DismissButton onClick={() => setRevealed(null)} />
             </div>
 
             <div className="px-5 py-5 space-y-4">
@@ -338,6 +335,7 @@ export default function TlsKeysPage() {
                   style={{ background: copied ? "var(--pqc-cyan-glow)" : "var(--bg-panel-raised)",
                            color: copied ? "var(--pqc-cyan)" : "var(--text-secondary)",
                            border: "1px solid var(--border-hairline)" }}
+                  aria-label={copied ? "Copied" : "Copy to clipboard"}
                   title="Copy to clipboard">
                   {copied ? <Check size={15} /> : <Copy size={15} />}
                 </button>
@@ -370,37 +368,14 @@ export default function TlsKeysPage() {
       )}
 
       {/* ── Revoke confirmation ─────────────────────────────────────────── */}
-      {confirmRevoke && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-6"
-             style={{ background: "rgba(0,0,0,0.72)" }}>
-          <div className="w-full max-w-md rounded-2xl p-5 space-y-4"
-               style={{ background: "var(--bg-panel)", border: "1px solid #7a1f33" }}>
-            <div className="flex items-center gap-2">
-              <ShieldAlert size={16} style={{ color: "var(--danger-red)" }} />
-              <span className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
-                Revoke {confirmRevoke.name}?
-              </span>
-            </div>
-            <p className="text-xs leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-              Any application using this key stops working immediately. This
-              cannot be undone — the key cannot be un-revoked or recovered,
-              because only its hash was ever stored.
-            </p>
-            <div className="flex gap-2">
-              <button onClick={() => revoke(confirmRevoke)}
-                className="px-3.5 py-2 rounded-lg text-xs font-bold focus-ring"
-                style={{ background: "var(--danger-red)", color: "#fff" }}>
-                Revoke permanently
-              </button>
-              <button onClick={() => setConfirmRevoke(null)}
-                className="px-3.5 py-2 rounded-lg text-xs font-medium focus-ring"
-                style={{ color: "var(--text-tertiary)", border: "1px solid var(--border-hairline)" }}>
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        open={confirmRevoke !== null}
+        title={`Revoke ${confirmRevoke?.name}?`}
+        description="Any application using this key stops working immediately. This cannot be undone — the key cannot be un-revoked or recovered, because only its hash was ever stored."
+        confirmLabel="Revoke permanently"
+        onConfirm={() => confirmRevoke && revoke(confirmRevoke)}
+        onCancel={() => setConfirmRevoke(null)}
+      />
 
       {/* ── Key list ────────────────────────────────────────────────────── */}
       <Panel>
@@ -418,7 +393,7 @@ export default function TlsKeysPage() {
             No TLS API key issued yet.
           </p>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Scrollable table">
             <table className="w-full text-left">
               <thead>
                 <tr className="border-b" style={{ borderColor: "var(--border-hairline)" }}>

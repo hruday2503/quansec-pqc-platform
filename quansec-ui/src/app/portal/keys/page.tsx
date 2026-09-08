@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { quansec, ApiKey, ApiKeyCreated } from "@/lib/api";
-import { Panel, PanelHeader } from "@/components/ui-primitives";
-import { Copy, Check, Plus, Trash2, X, KeyRound, AlertTriangle } from "lucide-react";
+import { Panel, PanelHeader, PageHeader, EmptyState, ConfirmDialog, DismissButton } from "@/components/ui-primitives";
+import { Copy, Check, Plus, Trash2, KeyRound, AlertTriangle } from "lucide-react";
 
 function timeAgo(iso: string | null) {
   if (!iso) return "Never used";
@@ -24,6 +24,7 @@ export default function KeysPage() {
   const [revealedKey, setRevealedKey] = useState<ApiKeyCreated | null>(null);
   const [copied, setCopied] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [confirmRevoke, setConfirmRevoke] = useState<ApiKey | null>(null);
 
   const load = async () => {
     try {
@@ -54,8 +55,9 @@ export default function KeysPage() {
     }
   };
 
-  const handleRevoke = async (id: number) => {
-    await quansec.revokeApiKey(id);
+  const handleRevoke = async (key: ApiKey) => {
+    await quansec.revokeApiKey(key.id);
+    setConfirmRevoke(null);
     await load();
   };
 
@@ -67,26 +69,21 @@ export default function KeysPage() {
 
   return (
     <div className="p-8 max-w-4xl mx-auto">
-      <div className="mb-8 flex items-start justify-between flex-wrap gap-4">
-        <div>
-          <div className="text-[11px] font-mono-display tracking-[0.18em] uppercase mb-1" style={{ color: "var(--text-tertiary)" }}>
-            Integration
-          </div>
-          <h1 className="text-2xl font-bold tracking-tight">API Keys</h1>
-          <p className="text-sm mt-1.5 max-w-lg" style={{ color: "var(--text-secondary)" }}>
-            Use an API key to connect your application to a quantum-safe IPsec tunnel.
-            Keys never expire until you revoke them.
-          </p>
-        </div>
-        <button
-          onClick={() => setShowCreateForm(true)}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition-opacity focus-ring shrink-0"
-          style={{ background: "var(--pqc-cyan)", color: "#04201c" }}
-        >
-          <Plus size={15} />
-          Generate new key
-        </button>
-      </div>
+      <PageHeader
+        eyebrow="Integration"
+        title="API keys"
+        description="Use an API key to connect your application to a quantum-safe IPsec tunnel. Keys never expire until you revoke them."
+        actions={
+          <button
+            onClick={() => setShowCreateForm(true)}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition-opacity focus-ring shrink-0"
+            style={{ background: "var(--pqc-cyan)", color: "#04201c" }}
+          >
+            <Plus size={15} />
+            Generate new key
+          </button>
+        }
+      />
 
       {/* Revealed key — shown once */}
       {revealedKey && (
@@ -102,14 +99,12 @@ export default function KeysPage() {
                   Store it in your environment variables or secrets manager.
                 </div>
               </div>
-              <button onClick={() => setRevealedKey(null)} className="shrink-0 focus-ring">
-                <X size={16} style={{ color: "var(--text-tertiary)" }} />
-              </button>
+              <DismissButton onClick={() => setRevealedKey(null)} />
             </div>
           </div>
           <div className="px-5 py-4 flex items-center gap-3">
             <code
-              className="flex-1 px-3.5 py-2.5 rounded-lg text-xs font-mono-display overflow-x-auto whitespace-nowrap"
+              className="flex-1 px-3.5 py-2.5 rounded-lg text-xs font-mono-display overflow-x-auto whitespace-nowrap break-all"
               style={{ background: "var(--bg-panel-raised)", color: "var(--pqc-cyan)" }}
             >
               {revealedKey.api_key}
@@ -167,13 +162,11 @@ export default function KeysPage() {
             <div className="px-5 py-10 text-center text-sm" style={{ color: "var(--text-tertiary)" }}>Loading…</div>
           )}
           {!loading && keys.length === 0 && (
-            <div className="px-5 py-12 text-center">
-              <KeyRound size={28} className="mx-auto mb-3" style={{ color: "var(--text-tertiary)" }} />
-              <div className="text-sm" style={{ color: "var(--text-secondary)" }}>No API keys yet</div>
-              <div className="text-xs mt-1" style={{ color: "var(--text-tertiary)" }}>
-                Generate a key to start integrating your quantum-safe tunnel
-              </div>
-            </div>
+            <EmptyState
+              icon={<KeyRound size={28} />}
+              title="No API keys yet"
+              hint="Generate a key to start integrating your quantum-safe tunnel."
+            />
           )}
           {keys.map((k) => (
             <div key={k.id} className="px-5 py-4 flex items-center justify-between gap-4">
@@ -187,14 +180,13 @@ export default function KeysPage() {
                   )}
                 </div>
                 <div className="flex items-center gap-3 text-xs font-mono-display" style={{ color: "var(--text-tertiary)" }}>
-                  <span>{k.key_prefix}</span>
-                  <span>·</span>
+                  <span className="break-all">{k.key_prefix}</span>
                   <span>{timeAgo(k.last_used)}</span>
                 </div>
               </div>
               {!k.revoked && (
                 <button
-                  onClick={() => handleRevoke(k.id)}
+                  onClick={() => setConfirmRevoke(k)}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono-display shrink-0 focus-ring transition-colors"
                   style={{ color: "var(--text-tertiary)" }}
                 >
@@ -206,6 +198,15 @@ export default function KeysPage() {
           ))}
         </div>
       </Panel>
+
+      <ConfirmDialog
+        open={confirmRevoke !== null}
+        title={`Revoke ${confirmRevoke?.name}?`}
+        description="Any application using this key stops working immediately. This cannot be undone."
+        confirmLabel="Revoke permanently"
+        onConfirm={() => confirmRevoke && handleRevoke(confirmRevoke)}
+        onCancel={() => setConfirmRevoke(null)}
+      />
     </div>
   );
 }

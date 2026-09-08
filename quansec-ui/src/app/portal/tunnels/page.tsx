@@ -1,8 +1,8 @@
 "use client";
 
 import { useLiveStats } from "@/lib/use-live-stats";
-import { Panel, PanelHeader, PqcBadge, StateBadge } from "@/components/ui-primitives";
-import { ArrowRight } from "lucide-react";
+import { Panel, PanelHeader, PageHeader, PqcBadge, StateBadge, EmptyState } from "@/components/ui-primitives";
+import { ArrowRight, Network } from "lucide-react";
 
 function formatBytes(n: number) {
   if (n < 1024) return `${n} B`;
@@ -15,17 +15,16 @@ export default function TunnelsPage() {
 
   return (
     <div className="p-8 max-w-7xl mx-auto">
-      <div className="mb-8">
-        <div className="text-[11px] font-mono-display tracking-[0.18em] uppercase mb-1" style={{ color: "var(--text-primary)" }}>
-          Network
-        </div>
-        <h1 className="text-2xl font-bold tracking-tight">IPsec Tunnels</h1>
-      </div>
+      <PageHeader eyebrow="Network" title="IPsec tunnels" accent="var(--pqc-cyan-dim)" />
 
       <div className="space-y-4">
         {tunnels.length === 0 && (
-          <Panel className="px-6 py-12 text-center text-sm" >
-            <span style={{ color: "var(--text-primary)" }}>No tunnels reporting</span>
+          <Panel>
+            <EmptyState
+              icon={<Network size={28} />}
+              title="No tunnels reporting"
+              hint="A tunnel appears here once IKEv2 negotiation establishes with a peer."
+            />
           </Panel>
         )}
 

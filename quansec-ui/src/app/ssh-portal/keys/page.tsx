@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Panel, PanelHeader } from "@/components/ui-primitives";
-import { Copy, Check, Plus, Trash2, X, KeyRound, AlertTriangle } from "lucide-react";
+import { Panel, PanelHeader, PageHeader, EmptyState, ConfirmDialog, DismissButton } from "@/components/ui-primitives";
+import { Copy, Check, Plus, Trash2, KeyRound, AlertTriangle } from "lucide-react";
 import { authHeaders as bearerHeaders } from "@/lib/auth-fetch";
 import { mockFetch } from "@/lib/mock/fetch";
 
@@ -23,6 +23,7 @@ export default function SshKeysPage() {
   const [revealed, setRevealed] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [showForm, setShowForm] = useState(false);
+  const [confirmRevoke, setConfirmRevoke] = useState<ApiKey | null>(null);
 
   const load = async () => {
     try {
@@ -45,27 +46,27 @@ export default function SshKeysPage() {
     } finally { setCreating(false); }
   };
 
-  const revoke = async (id: number) => {
-    await mockFetch(`/api/keys/${id}`, { method: "DELETE", headers: authHeaders() });
+  const revoke = async (key: ApiKey) => {
+    await mockFetch(`/api/keys/${key.id}`, { method: "DELETE", headers: authHeaders() });
+    setConfirmRevoke(null);
     await load();
   };
 
   return (
     <div className="p-8 max-w-4xl mx-auto">
-      <div className="mb-8 flex items-start justify-between flex-wrap gap-4">
-        <div>
-          <div className="text-[11px] font-mono-display font-semibold tracking-[0.18em] uppercase mb-1.5" style={{ color: "var(--lattice-violet-dim)" }}>Integration</div>
-          <h1 className="text-3xl font-extrabold tracking-tight" style={{ color: "var(--text-primary)" }}>API Keys</h1>
-          <p className="text-sm mt-1.5 max-w-lg" style={{ color: "var(--text-secondary)" }}>
-            Use an API key to query your SSH sessions&apos; quantum-safe status from your own systems.
-          </p>
-        </div>
-        <button onClick={() => setShowForm(true)}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-bold focus-ring shrink-0"
-          style={{ background: "var(--lattice-violet)", color: "#1a0f3d" }}>
-          <Plus size={15} /> Generate new key
-        </button>
-      </div>
+      <PageHeader
+        eyebrow="Integration"
+        title="API keys"
+        description="Use an API key to query your SSH sessions' quantum-safe status from your own systems."
+        accent="var(--lattice-violet)"
+        actions={
+          <button onClick={() => setShowForm(true)}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-bold focus-ring shrink-0"
+            style={{ background: "var(--lattice-violet)", color: "#1a0f3d" }}>
+            <Plus size={15} /> Generate new key
+          </button>
+        }
+      />
 
       {revealed && (
         <Panel className="mb-6 overflow-hidden">
@@ -76,11 +77,11 @@ export default function SshKeysPage() {
                 <div className="text-sm font-bold mb-1" style={{ color: "var(--lattice-violet)" }}>Save this key now — it won&apos;t be shown again</div>
                 <div className="text-xs" style={{ color: "var(--text-secondary)" }}>Store it in your environment variables.</div>
               </div>
-              <button onClick={() => setRevealed(null)} className="focus-ring"><X size={16} style={{ color: "var(--text-tertiary)" }} /></button>
+              <DismissButton onClick={() => setRevealed(null)} />
             </div>
           </div>
           <div className="px-5 py-4 flex items-center gap-3">
-            <code className="flex-1 px-3.5 py-2.5 rounded-lg text-xs font-mono-display overflow-x-auto whitespace-nowrap"
+            <code className="flex-1 px-3.5 py-2.5 rounded-lg text-xs font-mono-display overflow-x-auto whitespace-nowrap break-all"
               style={{ background: "var(--bg-panel-raised)", color: "var(--lattice-violet)" }}>{revealed}</code>
             <button onClick={() => { navigator.clipboard.writeText(revealed); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
               className="flex items-center gap-1.5 px-3 py-2.5 rounded-lg text-xs font-mono-display shrink-0 focus-ring"
@@ -110,10 +111,7 @@ export default function SshKeysPage() {
         <PanelHeader eyebrow={`${keys.filter((k) => !k.revoked).length} active`} title="Your keys" />
         <div className="divide-y" style={{ borderColor: "var(--border-hairline)" }}>
           {keys.length === 0 && (
-            <div className="px-5 py-12 text-center">
-              <KeyRound size={28} className="mx-auto mb-3" style={{ color: "var(--text-tertiary)" }} />
-              <div className="text-sm" style={{ color: "var(--text-secondary)" }}>No API keys yet</div>
-            </div>
+            <EmptyState icon={<KeyRound size={28} />} title="No API keys yet" />
           )}
           {keys.map((k) => (
             <div key={k.id} className="px-5 py-4 flex items-center justify-between gap-4">
@@ -122,10 +120,10 @@ export default function SshKeysPage() {
                   <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>{k.name}</span>
                   {k.revoked && <span className="text-[10px] font-mono-display px-1.5 py-0.5 rounded" style={{ background: "var(--danger-glow)", color: "var(--danger-red)" }}>REVOKED</span>}
                 </div>
-                <div className="text-xs font-mono-display" style={{ color: "var(--text-tertiary)" }}>{k.key_prefix}</div>
+                <div className="text-xs font-mono-display break-all" style={{ color: "var(--text-tertiary)" }}>{k.key_prefix}</div>
               </div>
               {!k.revoked && (
-                <button onClick={() => revoke(k.id)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono-display shrink-0 focus-ring" style={{ color: "var(--text-tertiary)" }}>
+                <button onClick={() => setConfirmRevoke(k)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono-display shrink-0 focus-ring" style={{ color: "var(--text-tertiary)" }}>
                   <Trash2 size={13} /> Revoke
                 </button>
               )}
@@ -133,6 +131,15 @@ export default function SshKeysPage() {
           ))}
         </div>
       </Panel>
+
+      <ConfirmDialog
+        open={confirmRevoke !== null}
+        title={`Revoke ${confirmRevoke?.name}?`}
+        description="Any application using this key stops working immediately. This cannot be undone."
+        confirmLabel="Revoke permanently"
+        onConfirm={() => confirmRevoke && revoke(confirmRevoke)}
+        onCancel={() => setConfirmRevoke(null)}
+      />
     </div>
   );
 }

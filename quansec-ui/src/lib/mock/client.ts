@@ -255,18 +255,11 @@ export class MockQuansecClient {
 
   connectLiveSocket(onMessage: (data: Record<string, unknown>) => void) {
     if (typeof window === "undefined") return null;
-    // No real socket in showcase mode — a lightweight timer stands in for it
-    // so the "LIVE" indicator and periodic refresh still work.
-    const timers: ReturnType<typeof setTimeout>[] = [];
-    timers.push(setTimeout(() => onMessage({ type: "connected" }), 300));
-    const interval = setInterval(() => {
-      onMessage({ kind: "lifecycle", event: "tunnel_traffic", occurred_at: new Date().toISOString() });
-    }, 6000);
+    // Reports a stable connected state. Underlying data is deterministic, so
+    // there is no recurring lifecycle event to simulate.
+    const timer = setTimeout(() => onMessage({ type: "connected" }), 300);
     return {
-      close: () => {
-        timers.forEach(clearTimeout);
-        clearInterval(interval);
-      },
+      close: () => clearTimeout(timer),
       onclose: null as (() => void) | null,
       onerror: null as (() => void) | null,
     } as unknown as WebSocket;

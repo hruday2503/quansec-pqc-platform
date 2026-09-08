@@ -202,7 +202,7 @@ export default function TlsSessionsPage() {
             No session matches these filters.
           </p>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Scrollable table">
             <table className="w-full text-left">
               <thead>
                 <tr className="border-b" style={{ borderColor: "var(--border-hairline)" }}>

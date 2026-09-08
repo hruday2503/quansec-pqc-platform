@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Panel, PanelHeader } from "@/components/ui-primitives";
-import { ShieldCheck, Copy, Check, Download, AlertTriangle, Fingerprint } from "lucide-react";
+import { Panel, PanelHeader, PageHeader, EmptyState } from "@/components/ui-primitives";
+import { ShieldCheck, Copy, Check, Download, AlertTriangle, Fingerprint, FilePlus } from "lucide-react";
 import { authHeaders as bearerHeaders } from "@/lib/auth-fetch";
 import { mockFetch } from "@/lib/mock/fetch";
 
@@ -70,24 +70,21 @@ export default function CertificatesPage() {
 
   return (
     <div className="p-8 max-w-4xl mx-auto">
-      <div className="mb-8">
-        <div className="text-[11px] font-mono-display font-semibold tracking-[0.18em] uppercase mb-1.5" style={{ color: "var(--lattice-violet-dim)" }}>
-          Certificate Authority
-        </div>
-        <h1 className="text-3xl font-extrabold tracking-tight" style={{ color: "var(--text-primary)" }}>Issue Certificate</h1>
-        <p className="text-sm mt-1.5" style={{ color: "var(--text-primary)" }}>
-          Onboard a user: sign their public key into a short-lived Zero Trust certificate
-        </p>
-      </div>
+      <PageHeader
+        eyebrow="Certificate authority"
+        title="Issue certificate"
+        description="Onboard a user: sign their public key into a short-lived Zero Trust certificate."
+        accent="var(--lattice-violet)"
+      />
 
       {/* CA info */}
       {caInfo && (
         <Panel className="mb-6 px-5 py-4">
           <div className="flex items-center gap-2 mb-2">
             <Fingerprint size={15} style={{ color: "var(--lattice-violet)" }} />
-            <span className="text-xs font-mono-display font-bold uppercase tracking-wider" style={{ color: "var(--text-primary)" }}>QUANSEC CA Fingerprint</span>
+            <span className="text-xs font-mono-display font-bold uppercase tracking-wider" style={{ color: "var(--text-primary)" }}>QUANSEC CA fingerprint</span>
           </div>
-          <div className="text-xs font-mono-display" style={{ color: "var(--text-primary)" }}>{caInfo.fingerprint}</div>
+          <div className="text-xs font-mono-display break-all" style={{ color: "var(--text-primary)" }}>{caInfo.fingerprint}</div>
         </Panel>
       )}
 
@@ -103,8 +100,8 @@ export default function CertificatesPage() {
           </div>
 
           <div>
-            <label className="block text-xs font-mono-display font-bold uppercase tracking-wide mb-2" style={{ color: "var(--text-primary)" }}>User Public Key</label>
-            <textarea value={publicKey} onChange={(e) => setPublicKey(e.target.value)} rows={3}
+            <label htmlFor="cert-public-key" className="block text-xs font-mono-display font-bold uppercase tracking-wide mb-2" style={{ color: "var(--text-primary)" }}>User Public Key</label>
+            <textarea id="cert-public-key" value={publicKey} onChange={(e) => setPublicKey(e.target.value)} rows={3}
               placeholder="ssh-ed25519 AAAAC3Nza... user@device"
               className="w-full px-3.5 py-2.5 rounded-lg text-xs font-mono-display outline-none focus-ring resize-none"
               style={{ background: "var(--bg-panel-raised)", border: "1px solid var(--border-hairline-bright)", color: "var(--text-primary)" }} />
@@ -112,20 +109,20 @@ export default function CertificatesPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label className="block text-xs font-mono-display font-bold uppercase tracking-wide mb-2" style={{ color: "var(--text-primary)" }}>Identity</label>
-              <input value={identity} onChange={(e) => setIdentity(e.target.value)} placeholder="alice@bank.com"
+              <label htmlFor="cert-identity" className="block text-xs font-mono-display font-bold uppercase tracking-wide mb-2" style={{ color: "var(--text-primary)" }}>Identity</label>
+              <input id="cert-identity" value={identity} onChange={(e) => setIdentity(e.target.value)} placeholder="alice@bank.com"
                 className="w-full px-3.5 py-2.5 rounded-lg text-sm outline-none focus-ring"
                 style={{ background: "var(--bg-panel-raised)", border: "1px solid var(--border-hairline-bright)", color: "var(--text-primary)" }} />
             </div>
             <div>
-              <label className="block text-xs font-mono-display font-bold uppercase tracking-wide mb-2" style={{ color: "var(--text-primary)" }}>Principals</label>
-              <input value={principals} onChange={(e) => setPrincipals(e.target.value)} placeholder="hd6441"
+              <label htmlFor="cert-principals" className="block text-xs font-mono-display font-bold uppercase tracking-wide mb-2" style={{ color: "var(--text-primary)" }}>Principals</label>
+              <input id="cert-principals" value={principals} onChange={(e) => setPrincipals(e.target.value)} placeholder="hd6441"
                 className="w-full px-3.5 py-2.5 rounded-lg text-sm outline-none focus-ring"
                 style={{ background: "var(--bg-panel-raised)", border: "1px solid var(--border-hairline-bright)", color: "var(--text-primary)" }} />
             </div>
             <div>
-              <label className="block text-xs font-mono-display font-bold uppercase tracking-wide mb-2" style={{ color: "var(--text-primary)" }}>Valid (hours)</label>
-              <input type="number" value={hours} min={1} max={168} onChange={(e) => setHours(parseInt(e.target.value) || 8)}
+              <label htmlFor="cert-hours" className="block text-xs font-mono-display font-bold uppercase tracking-wide mb-2" style={{ color: "var(--text-primary)" }}>Valid (hours)</label>
+              <input id="cert-hours" type="number" value={hours} min={1} max={168} onChange={(e) => setHours(parseInt(e.target.value) || 8)}
                 className="w-full px-3.5 py-2.5 rounded-lg text-sm outline-none focus-ring"
                 style={{ background: "var(--bg-panel-raised)", border: "1px solid var(--border-hairline-bright)", color: "var(--text-primary)" }} />
             </div>
@@ -172,7 +169,7 @@ export default function CertificatesPage() {
       {/* Issued certificates */}
       <Panel>
         <PanelHeader eyebrow={`${issued.length} issued`} title="Issued Certificates" />
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Scrollable table">
           <table className="w-full text-xs">
             <thead>
               <tr className="text-left border-b" style={{ borderColor: "var(--border-hairline)" }}>
@@ -183,7 +180,9 @@ export default function CertificatesPage() {
             </thead>
             <tbody>
               {issued.length === 0 && (
-                <tr><td colSpan={5} className="px-4 py-10 text-center text-sm" style={{ color: "var(--text-primary)" }}>No certificates issued yet</td></tr>
+                <tr><td colSpan={5}>
+                  <EmptyState icon={<FilePlus size={28} />} title="No certificates issued yet" hint="Sign a user's public key above to issue the first one." />
+                </td></tr>
               )}
               {issued.map((c) => (
                 <tr key={c.serial} className="border-b" style={{ borderColor: "var(--border-hairline)" }}>

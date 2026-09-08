@@ -28,7 +28,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   if (!user) return null;
 
   return (
-    <div className="min-h-screen flex" style={{ background: "var(--bg-void)" }}>
+    <div className="min-h-screen flex flex-col lg:flex-row" style={{ background: "var(--bg-void)" }}>
       <Sidebar />
       <main className="flex-1 min-w-0">{children}</main>
     </div>

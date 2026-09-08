@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { quansec, PolicyCompare, Policy } from "@/lib/api";
-import { Panel, PanelHeader } from "@/components/ui-primitives";
+import { Panel, PanelHeader, PageHeader } from "@/components/ui-primitives";
 import { Check, X, Calendar, Loader2 } from "lucide-react";
 
 export default function PolicyPage() {
@@ -37,14 +37,10 @@ export default function PolicyPage() {
 
   return (
     <div className="p-8 max-w-6xl mx-auto">
-      <div className="mb-8 flex items-center justify-between flex-wrap gap-4">
-        <div>
-          <div className="text-[11px] font-mono-display tracking-[0.18em] uppercase mb-1" style={{ color: "var(--text-tertiary)" }}>
-            Migration Control
-          </div>
-          <h1 className="text-2xl font-bold tracking-tight">Policy Engine</h1>
-        </div>
-        {compare && (
+      <PageHeader
+        eyebrow="Migration control"
+        title="Policy engine"
+        actions={compare && (
           <div
             className="flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-mono-display"
             style={{ background: "var(--lattice-violet-glow)", color: "var(--lattice-violet)", border: "1px solid var(--lattice-violet-dim)" }}
@@ -53,7 +49,7 @@ export default function PolicyPage() {
             {compare.days_remaining.toLocaleString()} days to {compare.cnsa_deadline}
           </div>
         )}
-      </div>
+      />
 
       {toast && (
         <div
@@ -106,7 +102,7 @@ export default function PolicyPage() {
       {/* Comparison table */}
       <Panel>
         <PanelHeader eyebrow="Compliance Report" title="What Changed and Why" />
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Scrollable table">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left border-b" style={{ borderColor: "var(--border-hairline)" }}>

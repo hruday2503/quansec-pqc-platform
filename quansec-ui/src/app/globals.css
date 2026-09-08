@@ -30,6 +30,36 @@
 
   --font-mono: 'JetBrains Mono', ui-monospace, monospace;
   --font-sans: 'Inter', system-ui, sans-serif;
+
+  /*
+   * Status semantics — the one place a state maps to a color. Every badge,
+   * gauge and indicator reads these instead of a raw palette name, so
+   * "what does teal mean here" always has one answer.
+   *   safe      healthy, protected, established, verified
+   *   warning   degraded, attention required
+   *   critical  vulnerable, failed, blocked
+   *   identity  SSH / certificate / PQC-identity context
+   *   neutral   inactive, unavailable, historical
+   */
+  --status-safe: var(--pqc-cyan);
+  --status-safe-dim: var(--pqc-cyan-dim);
+  --status-safe-glow: var(--pqc-cyan-glow);
+
+  --status-warning: var(--threat-amber);
+  --status-warning-dim: var(--threat-amber-dim);
+  --status-warning-glow: var(--threat-amber-glow);
+
+  --status-critical: var(--danger-red);
+  --status-critical-dim: #7a1f33;
+  --status-critical-glow: var(--danger-glow);
+
+  --status-identity: var(--lattice-violet);
+  --status-identity-dim: var(--lattice-violet-dim);
+  --status-identity-glow: var(--lattice-violet-glow);
+
+  --status-neutral: var(--text-tertiary);
+  --status-neutral-dim: var(--border-hairline-bright);
+  --status-neutral-glow: var(--bg-panel-raised);
 }
 
 * {
@@ -122,30 +152,4 @@ html, body {
   mask-composite: exclude;
   pointer-events: none;
   opacity: 0.6;
-}
-
-
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
 }

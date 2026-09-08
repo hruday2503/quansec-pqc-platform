@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Panel, PanelHeader } from "@/components/ui-primitives";
+import { Panel, PanelHeader, PageHeader, EmptyState } from "@/components/ui-primitives";
 import { Bell, BellOff, AlertTriangle, ShieldAlert, Check } from "lucide-react";
 import { authHeaders } from "@/lib/auth-fetch";
 import { mockFetch } from "@/lib/mock/fetch";
@@ -38,30 +38,29 @@ export default function AlertsPage() {
 
   return (
     <div className="p-8 max-w-4xl mx-auto">
-      <div className="mb-8 flex items-center justify-between flex-wrap gap-4">
-        <div>
-          <div className="text-[11px] font-mono-display font-semibold tracking-[0.18em] uppercase mb-1.5" style={{ color: "var(--threat-amber)" }}>
-            Monitoring
+      <PageHeader
+        eyebrow="Monitoring"
+        title="Alerts"
+        accent="var(--threat-amber)"
+        actions={
+          <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg" style={{ background: activeCount > 0 ? "var(--danger-glow)" : "var(--pqc-cyan-glow)", border: `1px solid ${activeCount > 0 ? "var(--danger-red)" : "var(--pqc-cyan-dim)"}` }}>
+            {activeCount > 0 ? <Bell size={16} style={{ color: "var(--danger-red)" }} /> : <BellOff size={16} style={{ color: "var(--pqc-cyan)" }} />}
+            <span className="text-sm font-bold font-mono-display" style={{ color: activeCount > 0 ? "var(--danger-red)" : "var(--pqc-cyan)" }}>
+              {activeCount} active
+            </span>
           </div>
-          <h1 className="text-3xl font-extrabold tracking-tight" style={{ color: "var(--text-primary)" }}>Alerts</h1>
-        </div>
-        <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg" style={{ background: activeCount > 0 ? "var(--danger-glow)" : "var(--pqc-cyan-glow)", border: `1px solid ${activeCount > 0 ? "var(--danger-red)" : "var(--pqc-cyan-dim)"}` }}>
-          {activeCount > 0 ? <Bell size={16} style={{ color: "var(--danger-red)" }} /> : <BellOff size={16} style={{ color: "var(--pqc-cyan)" }} />}
-          <span className="text-sm font-bold font-mono-display" style={{ color: activeCount > 0 ? "var(--danger-red)" : "var(--pqc-cyan)" }}>
-            {activeCount} active
-          </span>
-        </div>
-      </div>
+        }
+      />
 
       <Panel>
-        <PanelHeader eyebrow={`${alerts.length} total`} title="Alert Feed" />
+        <PanelHeader eyebrow={`${alerts.length} total`} title="Alert feed" />
         <div className="divide-y" style={{ borderColor: "var(--border-hairline)" }}>
           {alerts.length === 0 && (
-            <div className="px-5 py-12 text-center">
-              <ShieldAlert size={28} className="mx-auto mb-3" style={{ color: "var(--pqc-cyan)" }} />
-              <div className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>All clear</div>
-              <div className="text-xs mt-1" style={{ color: "var(--text-primary)" }}>No alerts — all connections quantum-safe</div>
-            </div>
+            <EmptyState
+              icon={<ShieldAlert size={28} style={{ color: "var(--pqc-cyan)" }} />}
+              title="All clear"
+              hint="No alerts — all connections quantum-safe."
+            />
           )}
           {alerts.map((a) => (
             <div key={a.id} className="px-5 py-4 flex items-start justify-between gap-4" style={{ opacity: a.acked ? 0.5 : 1 }}>

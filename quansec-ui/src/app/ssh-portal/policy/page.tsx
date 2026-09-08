@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Panel, PanelHeader } from "@/components/ui-primitives";
+import { Panel, PanelHeader, PageHeader } from "@/components/ui-primitives";
 import { Check, X, Calendar, Loader2 } from "lucide-react";
 import { authHeaders as bearerHeaders } from "@/lib/auth-fetch";
 import { mockFetch } from "@/lib/mock/fetch";
@@ -59,21 +59,18 @@ export default function SshPolicyPage() {
 
   return (
     <div className="p-8 max-w-6xl mx-auto">
-      <div className="mb-8 flex items-center justify-between flex-wrap gap-4">
-        <div>
-          <div className="text-[11px] font-mono-display font-semibold tracking-[0.18em] uppercase mb-1.5" style={{ color: "var(--lattice-violet-dim)" }}>
-            Migration Control
-          </div>
-          <h1 className="text-3xl font-extrabold tracking-tight" style={{ color: "var(--text-primary)" }}>SSH Policy Engine</h1>
-        </div>
-        {days !== null && (
+      <PageHeader
+        eyebrow="Migration control"
+        title="SSH policy engine"
+        accent="var(--lattice-violet)"
+        actions={days !== null && (
           <div className="flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-mono-display font-semibold"
             style={{ background: "var(--lattice-violet-glow)", color: "var(--lattice-violet)", border: "1px solid var(--lattice-violet-dim)" }}>
             <Calendar size={13} />
             {days.toLocaleString()} days to CNSA 2.0 SSH deadline
           </div>
         )}
-      </div>
+      />
 
       {toast && (
         <div className="mb-6 px-4 py-3 rounded-lg text-sm font-mono-display"
@@ -104,7 +101,7 @@ export default function SshPolicyPage() {
 
       <Panel>
         <PanelHeader eyebrow="Compliance Report" title="What Changed and Why" />
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Scrollable table">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left border-b" style={{ borderColor: "var(--border-hairline)" }}>

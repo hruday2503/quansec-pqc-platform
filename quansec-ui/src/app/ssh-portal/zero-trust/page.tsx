@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Panel, PanelHeader } from "@/components/ui-primitives";
-import { ShieldCheck, ShieldX, KeyRound, Clock, UserCheck, Ban, Fingerprint } from "lucide-react";
+import { Panel, PanelHeader, PageHeader, EmptyState } from "@/components/ui-primitives";
+import { ShieldCheck, ShieldX, KeyRound, Clock, UserCheck, Ban, Fingerprint, Users } from "lucide-react";
 import { authHeaders } from "@/lib/auth-fetch";
 import { mockFetch } from "@/lib/mock/fetch";
 
@@ -39,15 +39,12 @@ export default function ZeroTrustPage() {
 
   return (
     <div className="p-8 max-w-6xl mx-auto">
-      <div className="mb-8">
-        <div className="text-[11px] font-mono-display font-semibold tracking-[0.18em] uppercase mb-1.5" style={{ color: "var(--lattice-violet-dim)" }}>
-          Access Control
-        </div>
-        <h1 className="text-3xl font-extrabold tracking-tight" style={{ color: "var(--text-primary)" }}>Zero Trust</h1>
-        <p className="text-sm mt-1.5" style={{ color: "var(--text-primary)" }}>
-          Certificate-based identity · no passwords · no network trust · on post-quantum transport
-        </p>
-      </div>
+      <PageHeader
+        eyebrow="Access control"
+        title="Zero Trust"
+        description="Certificate-based identity, no passwords, no implicit network trust — all on post-quantum transport."
+        accent="var(--lattice-violet)"
+      />
 
       {/* Status cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
@@ -89,7 +86,7 @@ export default function ZeroTrustPage() {
       {/* Audit trail */}
       <Panel>
         <PanelHeader eyebrow="Audit Trail" title="Certificate Authentication Events" />
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Scrollable table">
           <table className="w-full text-xs">
             <thead>
               <tr className="text-left border-b" style={{ borderColor: "var(--border-hairline)" }}>
@@ -100,7 +97,9 @@ export default function ZeroTrustPage() {
             </thead>
             <tbody>
               {events.length === 0 && (
-                <tr><td colSpan={6} className="px-4 py-10 text-center text-sm" style={{ color: "var(--text-primary)" }}>No certificate auth events yet. Log in with a certificate to populate the trail.</td></tr>
+                <tr><td colSpan={6}>
+                  <EmptyState icon={<Users size={28} />} title="No certificate auth events yet" hint="A row appears here once a user authenticates with a certificate." />
+                </td></tr>
               )}
               {events.map((e, i) => (
                 <tr key={`${e.cert_serial}-${e.event_time}-${i}`} className="border-b" style={{ borderColor: "var(--border-hairline)" }}>

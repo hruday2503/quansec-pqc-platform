@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Copy, Check } from "lucide-react";
-import { Panel, PanelHeader } from "@/components/ui-primitives";
+import { Panel, PanelHeader, PageHeader, Tabs } from "@/components/ui-primitives";
 
 const SNIPPETS = {
   curl: {
@@ -78,27 +78,25 @@ export default function SshDocsPage() {
   const [active, setActive] = useState<keyof typeof SNIPPETS>("curl");
   return (
     <div className="p-8 max-w-4xl mx-auto">
-      <div className="mb-8">
-        <div className="text-[11px] font-mono-display font-semibold tracking-[0.18em] uppercase mb-1.5" style={{ color: "var(--lattice-violet-dim)" }}>
-          Developer Reference
-        </div>
-        <h1 className="text-3xl font-extrabold tracking-tight" style={{ color: "var(--text-primary)" }}>SSH Integration Guide</h1>
-        <p className="text-sm mt-1.5" style={{ color: "var(--text-secondary)" }}>
-          Connect and monitor SSH sessions secured with hybrid X25519 + ML-KEM-768.
-        </p>
-      </div>
+      <PageHeader
+        eyebrow="Developer reference"
+        title="SSH integration guide"
+        description="Connect and monitor SSH sessions secured with hybrid X25519 + ML-KEM-768."
+        accent="var(--lattice-violet)"
+      />
 
       <Panel className="mb-6">
-        <PanelHeader eyebrow="Reference" title="Code Examples" />
+        <PanelHeader eyebrow="Reference" title="Code examples" />
         <div className="px-5 pt-4 pb-5">
-          <div className="flex gap-1.5 mb-4 flex-wrap">
-            {(Object.keys(SNIPPETS) as Array<keyof typeof SNIPPETS>).map((k) => (
-              <button key={k} onClick={() => setActive(k)}
-                className="px-3 py-1.5 rounded-md text-xs font-mono-display font-medium focus-ring"
-                style={{ background: active === k ? "var(--lattice-violet-glow)" : "var(--bg-panel-raised)", color: active === k ? "var(--lattice-violet)" : "var(--text-tertiary)", border: `1px solid ${active === k ? "var(--lattice-violet-dim)" : "var(--border-hairline)"}` }}>
-                {SNIPPETS[k].label}
-              </button>
-            ))}
+          <div className="mb-4">
+            <Tabs
+              tabs={(Object.keys(SNIPPETS) as Array<keyof typeof SNIPPETS>).map((k) => ({ value: k, label: SNIPPETS[k].label }))}
+              active={active}
+              onChange={setActive}
+              accent="var(--lattice-violet)"
+              accentGlow="var(--lattice-violet-glow)"
+              accentDim="var(--lattice-violet-dim)"
+            />
           </div>
           <CodeBlock code={SNIPPETS[active].code} />
         </div>
@@ -106,7 +104,7 @@ export default function SshDocsPage() {
 
       <Panel>
         <PanelHeader eyebrow="Endpoints" title="SSH API" />
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Scrollable table">
           <table className="w-full text-xs font-mono-display">
             <tbody>
               {[

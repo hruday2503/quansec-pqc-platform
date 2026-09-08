@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Terminal, ArrowRight, Wifi, WifiOff, ShieldCheck } from "lucide-react";
 import { authHeaders } from "@/lib/auth-fetch";
 import { mockFetch } from "@/lib/mock/fetch";
+import { PageHeader } from "@/components/ui-primitives";
 
 export default function SshPortalOverview() {
   const [stats, setStats] = useState<{ active: number; pqc_enabled: number; pqc_coverage: number } | null>(null);
@@ -32,15 +33,12 @@ export default function SshPortalOverview() {
 
   return (
     <div className="p-8 max-w-5xl mx-auto">
-      <div className="mb-8">
-        <div className="text-[11px] font-mono-display font-semibold tracking-[0.18em] uppercase mb-1.5" style={{ color: "var(--lattice-violet-dim)" }}>
-          SSH Module
-        </div>
-        <h1 className="text-3xl font-extrabold tracking-tight" style={{ color: "var(--text-primary)" }}>Overview</h1>
-        <p className="text-sm mt-1.5" style={{ color: "var(--text-secondary)" }}>
-          Hybrid X25519 + ML-KEM-768 SSH monitoring
-        </p>
-      </div>
+      <PageHeader
+        eyebrow="SSH module"
+        title="Overview"
+        description="Hybrid X25519 + ML-KEM-768 SSH monitoring."
+        accent="var(--lattice-violet)"
+      />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-6">
         <div className="rounded-xl border px-6 py-5" style={{ background: "var(--bg-panel)", borderColor: "var(--border-hairline-bright)" }}>

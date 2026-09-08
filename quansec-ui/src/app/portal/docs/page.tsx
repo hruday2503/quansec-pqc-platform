@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Copy, Check } from "lucide-react";
-import { Panel, PanelHeader } from "@/components/ui-primitives";
+import { Panel, PanelHeader, PageHeader, Tabs } from "@/components/ui-primitives";
 
 const SNIPPETS = {
   curl: {
@@ -99,15 +99,11 @@ export default function DocsPage() {
 
   return (
     <div className="p-8 max-w-4xl mx-auto">
-      <div className="mb-8">
-        <div className="text-[11px] font-mono-display tracking-[0.18em] uppercase mb-1" style={{ color: "var(--text-tertiary)" }}>
-          Developer Reference
-        </div>
-        <h1 className="text-2xl font-bold tracking-tight">Integration Guide</h1>
-        <p className="text-sm mt-1.5" style={{ color: "var(--text-secondary)" }}>
-          Connect your application to a quantum-safe IPsec tunnel in minutes.
-        </p>
-      </div>
+      <PageHeader
+        eyebrow="Developer reference"
+        title="Integration guide"
+        description="Connect your application to a quantum-safe IPsec tunnel in minutes."
+      />
 
       {/* Step 1 */}
       <Panel className="mb-6">
@@ -122,21 +118,12 @@ export default function DocsPage() {
       <Panel className="mb-6">
         <PanelHeader eyebrow="Step 2" title="Authenticate your requests" />
         <div className="px-5 pt-4 pb-5">
-          <div className="flex gap-1.5 mb-4 flex-wrap">
-            {(Object.keys(SNIPPETS) as Array<keyof typeof SNIPPETS>).map((key) => (
-              <button
-                key={key}
-                onClick={() => setActive(key)}
-                className="px-3 py-1.5 rounded-md text-xs font-mono-display transition-colors focus-ring"
-                style={{
-                  background: active === key ? "var(--pqc-cyan-glow)" : "var(--bg-panel-raised)",
-                  color: active === key ? "var(--pqc-cyan)" : "var(--text-tertiary)",
-                  border: `1px solid ${active === key ? "var(--pqc-cyan-dim)" : "var(--border-hairline)"}`,
-                }}
-              >
-                {SNIPPETS[key].label}
-              </button>
-            ))}
+          <div className="mb-4">
+            <Tabs
+              tabs={(Object.keys(SNIPPETS) as Array<keyof typeof SNIPPETS>).map((key) => ({ value: key, label: SNIPPETS[key].label }))}
+              active={active}
+              onChange={setActive}
+            />
           </div>
           <CodeBlock code={SNIPPETS[active].code} />
         </div>
@@ -166,7 +153,7 @@ export default function DocsPage() {
       {/* API reference table */}
       <Panel>
         <PanelHeader eyebrow="Reference" title="Available endpoints" />
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Scrollable table">
           <table className="w-full text-xs font-mono-display">
             <tbody>
               {[
