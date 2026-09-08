@@ -1,4 +1,4 @@
-# QUANSEC Authentication
+# QUANSEQ Authentication
 
 Access tokens, refresh-token rotation, scopes, and how the TLS module is
 protected.
@@ -43,15 +43,15 @@ published key.
 | Variable | Default | Meaning |
 |---|---|---|
 | `JWT_SECRET` | *(none — required)* | HS384 signing secret, ≥48 bytes (96 hex chars) |
-| `JWT_ISSUER` | `quansec` | `iss` claim, verified on every request |
-| `JWT_AUDIENCE` | `quansec-api` | `aud` claim, verified on every request |
+| `JWT_ISSUER` | `quanseq` | `iss` claim, verified on every request |
+| `JWT_AUDIENCE` | `quanseq-api` | `aud` claim, verified on every request |
 | `ACCESS_TOKEN_TTL_MINUTES` | `15` | Access-token lifetime |
 | `REFRESH_TOKEN_TTL_DAYS` | `7` | Refresh-token lifetime |
 | `AUTH_COOKIE_SECURE` | `true` | `false` **only** for local HTTP dev |
 | `AUTH_COOKIE_SAMESITE` | `lax` | SameSite attribute |
-| `REFRESH_COOKIE_NAME` | `quansec_refresh` | Refresh cookie name |
+| `REFRESH_COOKIE_NAME` | `quanseq_refresh` | Refresh cookie name |
 | `REFRESH_COOKIE_PATH` | `/api/auth` | Cookie path — never sent to protocol APIs |
-| `CSRF_COOKIE_NAME` | `quansec_csrf` | Readable double-submit cookie |
+| `CSRF_COOKIE_NAME` | `quanseq_csrf` | Readable double-submit cookie |
 | `CSRF_HEADER_NAME` | `X-CSRF-Token` | Header echoing that cookie |
 | `LOGIN_RATE_LIMIT` | `10` | Attempts per window, per IP+email |
 | `LOGIN_RATE_WINDOW_SECONDS` | `300` | Window length |
@@ -70,7 +70,7 @@ signature entirely (`alg=none`) or force HMAC verification against a public key.
 python3 -c "import secrets; print(secrets.token_hex(48))"
 ```
 
-Put it in `quansec/.env` as `JWT_SECRET=…`. `.env` is git-ignored. Rotating the
+Put it in `quanseq/.env` as `JWT_SECRET=…`. `.env` is git-ignored. Rotating the
 secret invalidates every session; users log in again.
 
 ---
@@ -78,7 +78,7 @@ secret invalidates every session; users log in again.
 ## 3. Setup
 
 ```bash
-cd quansec
+cd quanseq
 
 # 1. Dependencies (Argon2id support is new)
 .venv/bin/pip install -r requirements.txt
@@ -184,8 +184,8 @@ It returns only what NGINX observed about the caller's own connection.
 ```
 POST /api/auth/login?use_cookie=true
   → 200 { access_token, expires_in, scopes, csrf_token, refresh_token: null }
-  → Set-Cookie: quansec_refresh=…; HttpOnly; Secure; SameSite=Lax; Path=/api/auth
-  → Set-Cookie: quansec_csrf=…;    Secure; SameSite=Lax; Path=/api/auth
+  → Set-Cookie: quanseq_refresh=…; HttpOnly; Secure; SameSite=Lax; Path=/api/auth
+  → Set-Cookie: quanseq_csrf=…;    Secure; SameSite=Lax; Path=/api/auth
 ```
 
 The refresh token is **absent from the body** — a response body is readable by
@@ -195,8 +195,8 @@ When the access token expires, the client calls:
 
 ```
 POST /api/auth/refresh
-  Cookie: quansec_refresh=…
-  X-CSRF-Token: <value of the quansec_csrf cookie>
+  Cookie: quanseq_refresh=…
+  X-CSRF-Token: <value of the quanseq_csrf cookie>
   → 200 { access_token, … } + a rotated refresh cookie
 ```
 
@@ -205,7 +205,7 @@ POST /api/auth/refresh
 ```bash
 # use_cookie=false returns the refresh token in the body
 curl -X POST 'http://127.0.0.1:8000/api/auth/login?use_cookie=false' \
-     -d 'username=admin@quansec.io&password=…'
+     -d 'username=admin@quanseq.io&password=…'
 
 curl -X POST http://127.0.0.1:8000/api/auth/refresh \
      -H 'Content-Type: application/json' \
@@ -257,7 +257,7 @@ Reuse in one family does not affect a user's other families, so a compromise in
 one session does not sign them out everywhere.
 
 **Client note:** never issue two refreshes concurrently. The second would
-present an already-rotated token and trip the detector. `QuansecClient.refresh()`
+present an already-rotated token and trip the detector. `QuanseqClient.refresh()`
 de-duplicates in-flight refreshes for this reason.
 
 ---
@@ -319,20 +319,20 @@ specific reason goes to the audit log.
 
 ## 10. Frontend migration
 
-**Before:** the access token was written to `localStorage["quansec_token"]` and
+**Before:** the access token was written to `localStorage["quanseq_token"]` and
 read directly by 12 pages.
 
 **After:**
 
-- The access token lives **in memory** on the `quansec` client singleton.
+- The access token lives **in memory** on the `quanseq` client singleton.
 - The refresh token is an **HttpOnly cookie** — unreadable by script.
-- `QuansecClient.restore()` silently exchanges the refresh cookie for a new
+- `QuanseqClient.restore()` silently exchanges the refresh cookie for a new
   access token on page load, so a reload does not log the user out.
 - Requests retry once after a silent refresh on 401, making the 15-minute
   expiry invisible.
 - Pages now import `authHeaders()` from `src/lib/auth-fetch.ts` instead of
   defining their own storage-reading helper.
-- Any legacy `quansec_token` value found in `localStorage` is **purged** —
+- Any legacy `quanseq_token` value found in `localStorage` is **purged** —
   leaving it would preserve the exposure this change closes.
 
 Rationale: `localStorage` is readable by any script on the origin, so one XSS
@@ -345,11 +345,11 @@ tab; an HttpOnly cookie cannot be read even while a payload is executing.
 
 ```bash
 # Backend
-cd quansec
+cd quanseq
 AUTH_COOKIE_SECURE=false .venv/bin/uvicorn main:app --port 8000
 
 # Frontend
-cd quansec-ui && npm run dev        # http://localhost:3000
+cd quanseq-ui && npm run dev        # http://localhost:3000
 ```
 
 `AUTH_COOKIE_SECURE=false` is required over plain HTTP: browsers silently drop
@@ -360,7 +360,7 @@ network.**
 ### Tests
 
 ```bash
-cd quansec
+cd quanseq
 .venv/bin/python -m pytest tests/test_auth_tokens.py tests/test_auth_api.py -q
 ```
 

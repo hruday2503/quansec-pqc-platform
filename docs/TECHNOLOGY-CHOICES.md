@@ -142,7 +142,7 @@ system sshd, for three reasons:
 
 **Chosen for lifespan, async, and generated schema — in that order.**
 
-**Lifespan owns the collectors.** QUANSEC's defining characteristic is five
+**Lifespan owns the collectors.** QUANSEQ's defining characteristic is five
 long-lived background tasks that must start with the app and stop cleanly with
 it. FastAPI's `@asynccontextmanager lifespan` makes that a first-class concept:
 
@@ -275,7 +275,7 @@ before production. See [DATA-MODEL.md](DATA-MODEL.md#migrations).
 
 ### 4.1 Redis as a pub/sub bus
 
-Redis carries exactly one thing: messages on channel `quansec:live`.
+Redis carries exactly one thing: messages on channel `quanseq:live`.
 
 ```
 collector / event listener  ──PUBLISH──►  Redis  ──SUBSCRIBE──►  WS endpoint  ──►  browser
@@ -293,7 +293,7 @@ unnecessary. Redis pub/sub is the smallest thing that works, and Redis is a
 single apt package with no broker configuration.
 
 **Why not a cache.** Redis holds no authoritative state. `core/redis_client.py`
-documents intended cache keys (`quansec:ipsec:snapshot` and friends), but the
+documents intended cache keys (`quanseq:ipsec:snapshot` and friends), but the
 collectors do not currently write them — everything goes to PostgreSQL. This is
 deliberate: a cache introduces an invalidation problem, and the read path is
 already sub-millisecond.
@@ -502,7 +502,7 @@ state.
 ## 8. Integration surfaces
 
 The design assumption is that **nobody adopts a new dashboard**. Enterprises have
-a monitoring stack and a SIEM already, so QUANSEC exports into both rather than
+a monitoring stack and a SIEM already, so QUANSEQ exports into both rather than
 asking to replace them.
 
 ### Prometheus text exposition at `/metrics`
@@ -518,7 +518,7 @@ restricted at the network layer.
 
 ### CEF, syslog and JSON for SIEM
 
-**CEF** (`CEF:0|QUANSEC|PQC-Platform|1.0|…`) is the ArcSight format that Splunk
+**CEF** (`CEF:0|QUANSEQ|PQC-Platform|1.0|…`) is the ArcSight format that Splunk
 and QRadar also parse — the closest thing to a lingua franca for security events.
 **RFC 5424 syslog** covers everything with a syslog receiver. **JSON** covers
 Elastic and anything modern.

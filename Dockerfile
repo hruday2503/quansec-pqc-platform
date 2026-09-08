@@ -8,12 +8,12 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 RUN apt-get update && apt-get install -y --no-install-recommends \
       ca-certificates iproute2 openssh-client openssh-server systemd \
     && rm -rf /var/lib/apt/lists/* \
-    && useradd --system --uid 10001 --home /nonexistent --shell /usr/sbin/nologin quansec
+    && useradd --system --uid 10001 --home /nonexistent --shell /usr/sbin/nologin quanseq
 
 WORKDIR /app
-COPY quansec/requirements.txt /tmp/requirements.txt
+COPY quanseq/requirements.txt /tmp/requirements.txt
 RUN python -m pip install --upgrade pip && python -m pip install -r /tmp/requirements.txt
-COPY quansec/ /app/
+COPY quanseq/ /app/
 
 USER 10001:10001
 EXPOSE 8000

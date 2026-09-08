@@ -38,7 +38,7 @@
 
 ## 1. What this module measures
 
-QUANSEC runs its own TLS 1.3 service and connects to it, in the same way the
+QUANSEQ runs its own TLS 1.3 service and connects to it, in the same way the
 IPsec module talks to StrongSwan and the SSH module reads sshd. Every poll is a
 real handshake; every recorded value was read off a live socket.
 
@@ -46,9 +46,9 @@ This is telemetry Option C from the original design (application instrumentation
 not Option A (nginx log tailing). Option A remains valid future work for observing
 third-party traffic — see [§12](#12-future-work).
 
-**What it does not measure:** traffic between a browser and the QUANSEC dashboard.
+**What it does not measure:** traffic between a browser and the QUANSEQ dashboard.
 That is ordinary HTTP on port 8000 and is untouched by this module. The TLS
-service is a separate process on its own port that QUANSEC observes.
+service is a separate process on its own port that QUANSEQ observes.
 
 ---
 
@@ -86,12 +86,12 @@ The FastAPI app never starts the TLS server. Three reasons:
 
 ```bash
 # On the peer machine
-QUANSEC_TLS_BIND_HOST=0.0.0.0  bash scripts/run_tls_service.sh
+QUANSEQ_TLS_BIND_HOST=0.0.0.0  bash scripts/run_tls_service.sh
 # Regenerate the server cert so its SAN covers the peer address
 python scripts/generate_tls_certs.py --extra-ip 192.168.1.50 --force
 
-# On the QUANSEC machine
-QUANSEC_TLS_HOST=192.168.1.50
+# On the QUANSEQ machine
+QUANSEQ_TLS_HOST=192.168.1.50
 ```
 
 Nothing else changes.
@@ -176,7 +176,7 @@ stalled handshake cannot block the event loop and a hung service surfaces as a
 | `tls_certificates` | Certificate inventory, for the eventual ML-DSA migration |
 
 One row per handshake rather than per-minute aggregate buckets: this module
-observes a service QUANSEC runs and polls, which is a bounded low-rate stream.
+observes a service QUANSEQ runs and polls, which is a bounded low-rate stream.
 The bucketed design in earlier revisions of this document belongs to the future
 nginx collector.
 
@@ -235,21 +235,21 @@ A failed handshake is **persisted before** the error is raised.
 
 ## 7. Configuration
 
-Every variable is documented in `quansec/.env.example`. The ones that change
+Every variable is documented in `quanseq/.env.example`. The ones that change
 behaviour most:
 
 | Variable | Default | Notes |
 |---|---|---|
-| `QUANSEC_TLS_ENABLED` | `true` | `false` makes every TLS route return 503 |
-| `QUANSEC_TLS_HOST` / `_PORT` | `127.0.0.1:8443` | Where the backend connects |
-| `QUANSEC_TLS_BIND_HOST` | `127.0.0.1` | Service only; `0.0.0.0` for two machines |
-| `QUANSEC_TLS_SERVER_HOSTNAME` | `localhost` | Must appear in the certificate SAN |
-| `QUANSEC_TLS_CERT_DIR` | `~/quansec-certs` | Keep **outside** the repository |
-| `QUANSEC_TLS_MTLS` | `false` | Requires a client certificate signed by the CA |
-| `QUANSEC_TLS_HANDSHAKE_TIMEOUT` | `5` | Per-connection cap; see the DoS note below |
-| `QUANSEC_TLS_REQUIRE_HYBRID` | `false` | Gates startup on a *capable* runtime; does **not** enforce |
-| `QUANSEC_TLS_OPENSSL_BIN` | `openssl` | Point at a 3.5+ build if you have one |
-| `QUANSEC_TLS_LOG_PAYLOADS` | `false` | Logs message bodies in cleartext. Debugging only |
+| `QUANSEQ_TLS_ENABLED` | `true` | `false` makes every TLS route return 503 |
+| `QUANSEQ_TLS_HOST` / `_PORT` | `127.0.0.1:8443` | Where the backend connects |
+| `QUANSEQ_TLS_BIND_HOST` | `127.0.0.1` | Service only; `0.0.0.0` for two machines |
+| `QUANSEQ_TLS_SERVER_HOSTNAME` | `localhost` | Must appear in the certificate SAN |
+| `QUANSEQ_TLS_CERT_DIR` | `~/quanseq-certs` | Keep **outside** the repository |
+| `QUANSEQ_TLS_MTLS` | `false` | Requires a client certificate signed by the CA |
+| `QUANSEQ_TLS_HANDSHAKE_TIMEOUT` | `5` | Per-connection cap; see the DoS note below |
+| `QUANSEQ_TLS_REQUIRE_HYBRID` | `false` | Gates startup on a *capable* runtime; does **not** enforce |
+| `QUANSEQ_TLS_OPENSSL_BIN` | `openssl` | Point at a 3.5+ build if you have one |
+| `QUANSEQ_TLS_LOG_PAYLOADS` | `false` | Logs message bodies in cleartext. Debugging only |
 
 `TlsSettings.validate()` runs at startup and fails loudly on unreadable
 certificates, impossible timeouts, mTLS without client material, or
@@ -261,7 +261,7 @@ certificates, impossible timeouts, mTLS without client material, or
 
 ```bash
 # 1. Development PKI (writes outside the repo, keys mode 600)
-python scripts/generate_tls_certs.py --cert-dir ~/quansec-certs
+python scripts/generate_tls_certs.py --cert-dir ~/quanseq-certs
 
 # 2. TLS transport service — its own terminal, its own process
 bash scripts/run_tls_service.sh
@@ -271,7 +271,7 @@ uvicorn main:app --host 0.0.0.0 --port 8000
 
 # 4. Confirm with an independent tool
 openssl s_client -connect 127.0.0.1:8443 -tls1_3 \
-        -CAfile ~/quansec-certs/ca.crt -servername localhost -brief </dev/null
+        -CAfile ~/quanseq-certs/ca.crt -servername localhost -brief </dev/null
 ```
 
 Expected on stock Ubuntu 24.04:
@@ -296,10 +296,10 @@ unconditionally, because the hybrid group is not enforced. Awarding that 15%
 would inflate the score with a property the platform does not have. TLS is
 included in `score_overall()`.
 
-**Metrics** (`protocols/metrics/router.py`) — `quansec_tls_handshakes_total`,
-`_successful`, `_failed`, `_pqc`, `quansec_tls_pqc_coverage_percent`,
-`quansec_tls13_handshakes`, `quansec_tls_handshake_duration_ms`,
-`quansec_tls_hybrid_verifications_total`, and `quansec_tls_hybrid_enforced`
+**Metrics** (`protocols/metrics/router.py`) — `quanseq_tls_handshakes_total`,
+`_successful`, `_failed`, `_pqc`, `quanseq_tls_pqc_coverage_percent`,
+`quanseq_tls13_handshakes`, `quanseq_tls_handshake_duration_ms`,
+`quanseq_tls_hybrid_verifications_total`, and `quanseq_tls_hybrid_enforced`
 (a constant `0`, exported so an operator can alert on it ever flipping).
 
 **Alerts** (`protocols/alerts/router.py`) — deliberately does **not** alert per
@@ -315,7 +315,7 @@ with a note explaining why.
 
 ## 10. Tests
 
-`quansec/tests/`, run with `.venv/bin/pytest tests/`.
+`quanseq/tests/`, run with `.venv/bin/pytest tests/`.
 
 | File | Covers |
 |---|---|
@@ -377,7 +377,7 @@ Rust bindings, or fronting the service with a proxy configured for
 change `hybrid.ENFORCEMENT_NOT_ENABLED` from a constant to a computed value.
 
 **Traffic collector (the original Option A).** Tail an nginx access log with
-`$ssl_curve` to observe real client traffic to servers QUANSEC does not
+`$ssl_curve` to observe real client traffic to servers QUANSEQ does not
 instrument. `NGINX_ACCESS_LOG` is still reserved for it. That collector genuinely
 does need per-minute aggregate buckets, since a busy server produces thousands of
 handshakes per second.
@@ -391,4 +391,4 @@ than assuming.
 
 ---
 
-*See also:* [IPSEC.md](IPSEC.md) · [SSH.md](SSH.md) · [ARCHITECTURE.md](../ARCHITECTURE.md) · [SECURITY.md](../SECURITY.md) · [API.md](../API.md) · [`protocols/tls/tls13/VENDOR.md`](../../quansec/protocols/tls/tls13/VENDOR.md)
+*See also:* [IPSEC.md](IPSEC.md) · [SSH.md](SSH.md) · [ARCHITECTURE.md](../ARCHITECTURE.md) · [SECURITY.md](../SECURITY.md) · [API.md](../API.md) · [`protocols/tls/tls13/VENDOR.md`](../../quanseq/protocols/tls/tls13/VENDOR.md)

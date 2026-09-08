@@ -1,6 +1,6 @@
 # Operations
 
-Running QUANSEC: process management, monitoring, integration, and a
+Running QUANSEQ: process management, monitoring, integration, and a
 troubleshooting matrix.
 
 > **Phase 1 deployment note:** the systemd monolith described below is retained
@@ -28,19 +28,19 @@ troubleshooting matrix.
 ### 1.1 Backend as a systemd unit
 
 ```ini
-# /etc/systemd/system/quansec.service
+# /etc/systemd/system/quanseq.service
 [Unit]
-Description=QUANSEC PQC Platform API
+Description=QUANSEQ PQC Platform API
 After=network.target postgresql.service redis-server.service
 Wants=postgresql.service redis-server.service
 
 [Service]
 Type=exec
-User=quansec
-Group=quansec
-WorkingDirectory=/opt/quansec/quansec          # ← must be the quansec/ dir
-Environment="PATH=/opt/quansec/quansec/.venv/bin"
-ExecStart=/opt/quansec/quansec/.venv/bin/uvicorn main:app --host 0.0.0.0 --port 8000
+User=quanseq
+Group=quanseq
+WorkingDirectory=/opt/quanseq/quanseq          # ← must be the quanseq/ dir
+Environment="PATH=/opt/quanseq/quanseq/.venv/bin"
+ExecStart=/opt/quanseq/quanseq/.venv/bin/uvicorn main:app --host 0.0.0.0 --port 8000
 Restart=on-failure
 RestartSec=5
 StandardOutput=journal
@@ -48,7 +48,7 @@ StandardError=journal
 
 # Hardening — relax only what the policy engines actually need
 NoNewPrivileges=false          # required: the engines call sudo
-PrivateTmp=false               # required: dev mode writes to /tmp/quansec
+PrivateTmp=false               # required: dev mode writes to /tmp/quanseq
 ProtectSystem=full
 ProtectHome=read-only          # the CA key lives under ~; read-only is enough
 
@@ -58,31 +58,31 @@ WantedBy=multi-user.target
 
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl enable --now quansec
-sudo journalctl -u quansec -f
+sudo systemctl enable --now quanseq
+sudo journalctl -u quanseq -f
 ```
 
-`WorkingDirectory` **must** be the `quansec/` subdirectory — `main.py` imports as
+`WorkingDirectory` **must** be the `quanseq/` subdirectory — `main.py` imports as
 `core.*` and `protocols.*`.
 
 ### 1.2 Frontend
 
 ```bash
-cd quansec-ui && npm run build
+cd quanseq-ui && npm run build
 ```
 
 ```ini
-# /etc/systemd/system/quansec-ui.service
+# /etc/systemd/system/quanseq-ui.service
 [Service]
 Type=exec
-User=quansec
-WorkingDirectory=/opt/quansec/quansec-ui
+User=quanseq
+WorkingDirectory=/opt/quanseq/quanseq-ui
 ExecStart=/usr/bin/npm run start
 Environment="NODE_ENV=production"
 Restart=on-failure
 ```
 
-`NEXT_PUBLIC_QUANSEC_API` is inlined at **build** time — changing it requires
+`NEXT_PUBLIC_QUANSEQ_API` is inlined at **build** time — changing it requires
 `npm run build` again.
 
 ### 1.3 Reverse proxy
@@ -90,9 +90,9 @@ Restart=on-failure
 ```nginx
 server {
     listen 443 ssl http2;
-    server_name quansec.example.com;
-    ssl_certificate     /etc/ssl/certs/quansec.crt;
-    ssl_certificate_key /etc/ssl/private/quansec.key;
+    server_name quanseq.example.com;
+    ssl_certificate     /etc/ssl/certs/quanseq.crt;
+    ssl_certificate_key /etc/ssl/private/quanseq.key;
 
     location /api/ { proxy_pass http://127.0.0.1:8000; include /etc/nginx/proxy_params; }
     location /docs { proxy_pass http://127.0.0.1:8000; }
@@ -168,67 +168,67 @@ ORDER BY last_seen DESC LIMIT 5;
 
 ```yaml
 scrape_configs:
-  - job_name: quansec
+  - job_name: quanseq
     scrape_interval: 15s
     static_configs:
-      - targets: ['quansec-host:8000']
+      - targets: ['quanseq-host:8000']
 ```
 
 ### Exported metrics
 
 | Metric | Type | Meaning |
 |---|---|---|
-| `quansec_ipsec_tunnels_total` | gauge | Tunnels known |
-| `quansec_ipsec_tunnels_established` | gauge | Currently up |
-| `quansec_ipsec_tunnels_pqc` | gauge | PQC-enabled |
-| `quansec_ipsec_pqc_coverage_percent` | gauge | PQC ÷ established |
-| `quansec_ipsec_bytes_{in,out}_total` | counter | Traffic |
-| `quansec_ssh_sessions_total` | gauge | Sessions ever seen |
-| `quansec_ssh_sessions_active` | gauge | Currently active |
-| `quansec_ssh_sessions_pqc` | gauge | Active and PQC |
-| `quansec_ssh_pqc_coverage_percent` | gauge | PQC ÷ active |
-| `quansec_ssh_bytes_{sent,received}_total` | counter | Traffic |
-| `quansec_zt_auth_{accepted,rejected}_total` | counter | Certificate auths |
+| `quanseq_ipsec_tunnels_total` | gauge | Tunnels known |
+| `quanseq_ipsec_tunnels_established` | gauge | Currently up |
+| `quanseq_ipsec_tunnels_pqc` | gauge | PQC-enabled |
+| `quanseq_ipsec_pqc_coverage_percent` | gauge | PQC ÷ established |
+| `quanseq_ipsec_bytes_{in,out}_total` | counter | Traffic |
+| `quanseq_ssh_sessions_total` | gauge | Sessions ever seen |
+| `quanseq_ssh_sessions_active` | gauge | Currently active |
+| `quanseq_ssh_sessions_pqc` | gauge | Active and PQC |
+| `quanseq_ssh_pqc_coverage_percent` | gauge | PQC ÷ active |
+| `quanseq_ssh_bytes_{sent,received}_total` | counter | Traffic |
+| `quanseq_zt_auth_{accepted,rejected}_total` | counter | Certificate auths |
 
 ### Alerting rules
 
 ```yaml
 groups:
-  - name: quansec-pqc
+  - name: quanseq-pqc
     rules:
       - alert: PQCCoverageDropped
-        expr: quansec_ipsec_pqc_coverage_percent < 100
+        expr: quanseq_ipsec_pqc_coverage_percent < 100
         for: 2m
         labels: {severity: critical}
         annotations:
           summary: "IPsec PQC coverage at {{ $value }}% — a tunnel is classical"
 
       - alert: SSHPQCCoverageDropped
-        expr: quansec_ssh_pqc_coverage_percent < 100
+        expr: quanseq_ssh_pqc_coverage_percent < 100
         for: 2m
         labels: {severity: critical}
 
       - alert: ZeroTrustRejectionSpike
-        expr: rate(quansec_zt_auth_rejected_total[5m]) > 0.1
+        expr: rate(quanseq_zt_auth_rejected_total[5m]) > 0.1
         for: 5m
         labels: {severity: warning}
         annotations:
           summary: "Elevated certificate rejections — expired certs or an intrusion attempt"
 
-      - alert: QuansecDown
-        expr: up{job="quansec"} == 0
+      - alert: QuanseqDown
+        expr: up{job="quanseq"} == 0
         for: 1m
         labels: {severity: critical}
 ```
 
-`quansec_ipsec_tunnels_established == 0` while `_total > 0` is the clearest
+`quanseq_ipsec_tunnels_established == 0` while `_total > 0` is the clearest
 "everything went down" signal.
 
 ### Dashboard panels worth building
 
 1. PQC coverage % over time, both protocols — the headline chart.
 2. Established tunnels and active sessions — capacity.
-3. Traffic rate — `rate(quansec_*_bytes_*_total[5m])`.
+3. Traffic rate — `rate(quanseq_*_bytes_*_total[5m])`.
 4. Zero Trust accept/reject rate.
 5. A single stat: days until the CNSA 2.0 deadline (from
    `/api/{ipsec,ssh}/policies/compare`).
@@ -237,23 +237,23 @@ groups:
 
 ## 4. SIEM integration
 
-Pull-based. QUANSEC exports; the SIEM ingests on its own schedule.
+Pull-based. QUANSEQ exports; the SIEM ingests on its own schedule.
 
 ```bash
 # CEF — ArcSight, Splunk, QRadar
-curl -s "https://quansec/api/siem/events?format=cef" -H "Authorization: Bearer $KEY"
+curl -s "https://quanseq/api/siem/events?format=cef" -H "Authorization: Bearer $KEY"
 
 # RFC 5424 syslog
-curl -s "https://quansec/api/siem/events?format=syslog" -H "Authorization: Bearer $KEY"
+curl -s "https://quanseq/api/siem/events?format=syslog" -H "Authorization: Bearer $KEY"
 
 # JSON — Elastic
-curl -s "https://quansec/api/siem/events?format=json" -H "Authorization: Bearer $KEY"
+curl -s "https://quanseq/api/siem/events?format=json" -H "Authorization: Bearer $KEY"
 ```
 
 Use an **API key**, not a JWT — it does not expire mid-poll.
 
 ```
-CEF:0|QUANSEC|PQC-Platform|1.0|zt_rejected|Zt Rejected|8|rt=2026-07-29T14:19:02+00:00 act=zt_rejected outcome=ssh-zero-trust msg=identity=alice@quansec.io src=192.168.1.6 reason=expired
+CEF:0|QUANSEQ|PQC-Platform|1.0|zt_rejected|Zt Rejected|8|rt=2026-07-29T14:19:02+00:00 act=zt_rejected outcome=ssh-zero-trust msg=identity=alice@quanseq.io src=192.168.1.6 reason=expired
 ```
 
 CEF severities: ZT rejection 8, attacks 6, key revocation 6, policy change 5,
@@ -263,9 +263,9 @@ Splunk forwarder:
 
 ```conf
 # inputs.conf
-[script://./bin/quansec_poll.sh]
+[script://./bin/quanseq_poll.sh]
 interval = 60
-sourcetype = quansec:cef
+sourcetype = quanseq:cef
 ```
 
 **Known gap:** the export currently returns **Zero Trust events only**. The
@@ -310,31 +310,31 @@ rules are Python, not database rows, despite the `alert_rules` table existing.
 Structured by logger name:
 
 ```
-2026-07-29 14:23:11  INFO   quansec.ipsec.collector  IPsec poll: 1 tunnels, 1 PQC-enabled
-2026-07-29 14:23:11  INFO   quansec.ssh.collector    SSH poll: 1 sessions, 1 PQC-enabled
-2026-07-29 14:23:14  INFO   quansec.ipsec.events     Lifecycle event: pqc-tunnel -> ESTABLISHED
-2026-07-29 14:24:02  WARNING quansec.ipsec.policy    StrongSwan not installed — policy saved to /tmp/…
+2026-07-29 14:23:11  INFO   quanseq.ipsec.collector  IPsec poll: 1 tunnels, 1 PQC-enabled
+2026-07-29 14:23:11  INFO   quanseq.ssh.collector    SSH poll: 1 sessions, 1 PQC-enabled
+2026-07-29 14:23:14  INFO   quanseq.ipsec.events     Lifecycle event: pqc-tunnel -> ESTABLISHED
+2026-07-29 14:24:02  WARNING quanseq.ipsec.policy    StrongSwan not installed — policy saved to /tmp/…
 ```
 
 | Logger | Emits |
 |---|---|
-| `quansec.main` | Startup, migrations, shutdown |
-| `quansec.ipsec.collector` | Poll results, VICI availability |
-| `quansec.ipsec.events` | Lifecycle events, listener reconnects |
-| `quansec.ipsec.policy` | Policy applications, dev-mode warnings |
-| `quansec.ssh.collector` | Poll results |
-| `quansec.ssh.policy` | Policy applications and restarts |
-| `quansec.ssh.ca` | Certificate issuance |
-| `quansec.ssh.ztaudit` | ZT collection errors |
-| `quansec.alerts` | Rule evaluation errors |
+| `quanseq.main` | Startup, migrations, shutdown |
+| `quanseq.ipsec.collector` | Poll results, VICI availability |
+| `quanseq.ipsec.events` | Lifecycle events, listener reconnects |
+| `quanseq.ipsec.policy` | Policy applications, dev-mode warnings |
+| `quanseq.ssh.collector` | Poll results |
+| `quanseq.ssh.policy` | Policy applications and restarts |
+| `quanseq.ssh.ca` | Certificate issuance |
+| `quanseq.ssh.ztaudit` | ZT collection errors |
+| `quanseq.alerts` | Rule evaluation errors |
 
 Lines worth alerting on:
 
 ```bash
-journalctl -u quansec | grep "VICI socket not available"   # data plane blind
-journalctl -u quansec | grep "collect error"               # collector failing
-journalctl -u quansec | grep "dev_mode=true"               # policy not enforced
-journalctl -u quansec | grep "Migration .* error"          # schema problem
+journalctl -u quanseq | grep "VICI socket not available"   # data plane blind
+journalctl -u quanseq | grep "collect error"               # collector failing
+journalctl -u quanseq | grep "dev_mode=true"               # policy not enforced
+journalctl -u quanseq | grep "Migration .* error"          # schema problem
 ```
 
 Raise verbosity with `LOG_LEVEL` in `.env` — note that several failures
@@ -357,7 +357,7 @@ DELETE FROM ssh_connections WHERE state='CLOSED' AND last_seen < NOW() - INTERVA
 ```
 
 ```cron
-0 3 * * * psql -U quansec_user -d quansec_db -f /opt/quansec/retention.sql
+0 3 * * * psql -U quanseq_user -d quanseq_db -f /opt/quanseq/retention.sql
 ```
 
 ### Size check
@@ -396,7 +396,7 @@ VACUUM ANALYZE ipsec_events;
 ### Why one worker
 
 Each uvicorn worker executes the full `lifespan`, so N workers means N copies of
-all five collectors: duplicate writes, duplicate `quansec:live` publishes, and N
+all five collectors: duplicate writes, duplicate `quanseq:live` publishes, and N
 concurrent VICI connections.
 
 ### Splitting collectors from the API
@@ -408,8 +408,8 @@ The change that unlocks horizontal scaling:
 3. Run one collector process and N API workers.
 
 ```ini
-ExecStart=…/uvicorn main:app --workers 4        # quansec-api.service
-ExecStart=…/python collector_main.py            # quansec-collectors.service (one instance)
+ExecStart=…/uvicorn main:app --workers 4        # quanseq-api.service
+ExecStart=…/python collector_main.py            # quanseq-collectors.service (one instance)
 ```
 
 Redis pub/sub already supports this — every API worker subscribes independently,
@@ -442,16 +442,16 @@ start overlapping their own timeouts.
 | Redis | none | Transient by design |
 
 ```bash
-pg_dump -U quansec_user -d quansec_db -Fc -f quansec-$(date +%F).dump
+pg_dump -U quanseq_user -d quanseq_db -Fc -f quanseq-$(date +%F).dump
 ```
 
 ### Restore
 
 ```bash
-sudo systemctl stop quansec
-dropdb -U postgres quansec_db && createdb -U postgres -O quansec_user quansec_db
-pg_restore -U quansec_user -d quansec_db quansec-2026-07-29.dump
-sudo systemctl start quansec
+sudo systemctl stop quanseq
+dropdb -U postgres quanseq_db && createdb -U postgres -O quanseq_user quanseq_db
+pg_restore -U quanseq_user -d quanseq_db quanseq-2026-07-29.dump
+sudo systemctl start quanseq
 ```
 
 Migrations re-run on startup and are idempotent, so a restore of an older dump
@@ -472,7 +472,7 @@ Recovery is: generate a new CA, distribute the new public key to every server's
 ```bash
 python3 -c "import secrets; print(secrets.token_hex(32))"
 # update JWT_SECRET in .env
-sudo systemctl restart quansec
+sudo systemctl restart quanseq
 ```
 
 Every existing token is invalidated; all users must log in again. That is the
@@ -528,9 +528,9 @@ See [SETUP.md §6.3](SETUP.md#63-issue-a-certificate).
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| `ModuleNotFoundError: core` | Started outside `quansec/` | `WorkingDirectory=/…/quansec` |
+| `ModuleNotFoundError: core` | Started outside `quanseq/` | `WorkingDirectory=/…/quanseq` |
 | `/health` → `degraded` | PostgreSQL unreachable | `systemctl status postgresql`; check `DATABASE_URL` |
-| Fewer than 5 collectors listed | A task died | `journalctl -u quansec \| grep -i error`; restart |
+| Fewer than 5 collectors listed | A task died | `journalctl -u quanseq \| grep -i error`; restart |
 | Migration errors on startup | Expected on re-run — all statements are idempotent | Investigate only if a table is genuinely missing |
 | 500s on every endpoint | Pool exhausted or DB down | Check `max_size`; check connection count |
 
@@ -560,10 +560,10 @@ See [SETUP.md §6.3](SETUP.md#63-issue-a-certificate).
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| No events | Wrong log path, or auths happen on another host | `QUANSEC_ZT_LOG`, or `QUANSEC_ZT_REMOTE` |
+| No events | Wrong log path, or auths happen on another host | `QUANSEQ_ZT_LOG`, or `QUANSEQ_ZT_REMOTE` |
 | `source_ip: "unknown"` | PID correlation failed on a standalone rejection | Log format differs from the expected `sshd-session[PID]` shape |
 | Certs rejected as expired immediately | Clock skew beyond the 1-hour backdate | Sync NTP on both hosts |
-| `ca_info` → 500 | `QUANSEC_CA_KEY` wrong, or `.pub` unreadable | Check the path and permissions |
+| `ca_info` → 500 | `QUANSEQ_CA_KEY` wrong, or `.pub` unreadable | Check the path and permissions |
 
 ### Frontend
 
@@ -573,7 +573,7 @@ See [SETUP.md §6.3](SETUP.md#63-issue-a-certificate).
 | CORS errors | Origin not allowed | Update `allow_origins` in `main.py` |
 | Live badge grey | WebSocket failed | Redis down, or the proxy lacks `Upgrade` headers |
 | Data never updates | Polling erroring silently — errors are swallowed by design | Open the browser network tab |
-| Calls hit the wrong host after a config change | `NEXT_PUBLIC_QUANSEC_API` is inlined at build time | `npm run build` again |
+| Calls hit the wrong host after a config change | `NEXT_PUBLIC_QUANSEQ_API` is inlined at build time | `npm run build` again |
 
 ---
 

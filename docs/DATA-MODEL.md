@@ -233,7 +233,7 @@ Created by `migrations/007_tls.sql`, written by `protocols/tls/collector.py`
 
 One row per **observed handshake**, successful or failed. Not aggregated into
 per-minute buckets like a public-traffic collector would need: this module
-observes a service QUANSEC runs and polls, which is a bounded low-rate stream.
+observes a service QUANSEQ runs and polls, which is a bounded low-rate stream.
 
 | Column | Type | Notes |
 |---|---|---|
@@ -307,7 +307,7 @@ The score is currently low, but it is earned rather than seeded — see
 ### `fail_mode_policies`
 
 Seeded with sensible defaults (IPsec/SSH/TLS `fail-secure`, VPN `fail-open`).
-The `tls` entry is **advisory only** — QUANSEC cannot enforce TLS 1.3 group
+The `tls` entry is **advisory only** — QUANSEQ cannot enforce TLS 1.3 group
 selection through Python's `ssl` module, so setting it records intent rather
 than changing what the TLS service accepts.
 **Not read.** `protocols/failmode/router.py` keeps state in an in-memory

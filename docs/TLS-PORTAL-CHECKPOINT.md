@@ -10,17 +10,17 @@ Last commit: `258331f`. Work after it is **uncommitted** (instructed not to comm
 
 | | Path |
 |---|---|
-| Backend | `quansec/` — `uvicorn main:app` on `:8000`, `--reload` |
-| Frontend | `quansec-ui/` (top level) — `next dev` on `:3000` |
-| PQC runtime | `~/.quansec/pqc-tls/` — OpenSSL 3.5.7, NGINX 1.27.5 |
-| Dev PKI | `~/quansec-certs/` — ca/server/client `.crt` + `.key` |
-| Ignore | `quansec-pqc-platform/` and `TLS-SMOAD-HSC/` — separate repos, gitignored |
+| Backend | `quanseq/` — `uvicorn main:app` on `:8000`, `--reload` |
+| Frontend | `quanseq-ui/` (top level) — `next dev` on `:3000` |
+| PQC runtime | `~/.quanseq/pqc-tls/` — OpenSSL 3.5.7, NGINX 1.27.5 |
+| Dev PKI | `~/quanseq-certs/` — ca/server/client `.crt` + `.key` |
+| Ignore | `quanseq-pqc-platform/` and `TLS-SMOAD-HSC/` — separate repos, gitignored |
 
 Listeners: `:8443` strict-hybrid (probes/evidence, `/dataplane/` only),
 `:8444` portal (proxies `/`→Next.js, `/api/`→FastAPI, classical fallback
 permitted, logged separately, never probed).
 
-Admin: `admin@quansec.io` / `Admin@QuanSec2024!` (from `quansec/.env`).
+Admin: `admin@quanseq.io` / `Admin@QuanSeq2024!` (from `quanseq/.env`).
 API keys authenticate via `Authorization: Bearer qsk_live_…`, **not** `X-API-Key`.
 
 ## Completed and verified

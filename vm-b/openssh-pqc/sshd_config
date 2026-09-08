@@ -1,4 +1,4 @@
-# QUANSEC PQC SSH \u2014 port 2222, ML-KEM-768 hybrid only
+# QUANSEQ PQC SSH \u2014 port 2222, ML-KEM-768 hybrid only
 Port 2222
 HostKey /opt/openssh-pqc/etc/ssh_host_ed25519_key
 HostKey /opt/openssh-pqc/etc/ssh_host_rsa_key
@@ -6,7 +6,7 @@ HostKey /opt/openssh-pqc/etc/ssh_host_rsa_key
 # Post-quantum hybrid KEX ONLY \u2014 classical rejected
 KexAlgorithms mlkem768x25519-sha256
 
-# DEBUG1 logging so QUANSEC can read the negotiated KEX
+# DEBUG1 logging so QUANSEQ can read the negotiated KEX
 LogLevel DEBUG1
 SyslogFacility AUTH
 
@@ -14,9 +14,9 @@ PermitRootLogin no
 Subsystem sftp /opt/openssh-pqc/libexec/sftp-server
 PidFile /opt/openssh-pqc/var/sshd-pqc.pid
 
-# === QUANSEC Zero Trust ===
-# Trust certificates signed by the QUANSEC CA
-TrustedUserCAKeys /opt/openssh-pqc/etc/quansec_ca.pub
+# === QUANSEQ Zero Trust ===
+# Trust certificates signed by the QUANSEQ CA
+TrustedUserCAKeys /opt/openssh-pqc/etc/quanseq_ca.pub
 # No passwords — identity must be proven by certificate
 PubkeyAuthentication yes
 # No keyboard-interactive fallback

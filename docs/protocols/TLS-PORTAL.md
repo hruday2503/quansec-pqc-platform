@@ -43,39 +43,39 @@ own listener instead. Sessions observed on `:8444` describe what a client
 ## 2. Running it
 
 Ubuntu's system OpenSSL (3.0.x) cannot do ML-KEM. The runtime is built from
-source into `~/.quansec/pqc-tls` and **the system OpenSSL is never replaced.**
+source into `~/.quanseq/pqc-tls` and **the system OpenSSL is never replaced.**
 
 ```bash
 # One time — builds OpenSSL 3.5.7 + NGINX 1.27.5. Takes a while.
-bash quansec/scripts/build-pqc-tls-runtime.sh
+bash quanseq/scripts/build-pqc-tls-runtime.sh
 
-# One time — development PKI into ~/quansec-certs (ca, server, client)
-python3 quansec/scripts/generate_tls_certs.py
+# One time — development PKI into ~/quanseq-certs (ca, server, client)
+python3 quanseq/scripts/generate_tls_certs.py
 
 # Database
-cd quansec && source .venv/bin/activate
-python3 seed_admin.py            # admin@quansec.io, password from ADMIN_PASSWORD
+cd quanseq && source .venv/bin/activate
+python3 seed_admin.py            # admin@quanseq.io, password from ADMIN_PASSWORD
 
 # Data plane
-bash quansec/scripts/start-pqc-tls.sh
-bash quansec/scripts/status-pqc-tls.sh
-bash quansec/scripts/stop-pqc-tls.sh
+bash quanseq/scripts/start-pqc-tls.sh
+bash quanseq/scripts/status-pqc-tls.sh
+bash quanseq/scripts/stop-pqc-tls.sh
 
 # Backend (migrations run automatically at startup)
-cd quansec && uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+cd quanseq && uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 
 # Frontend
-cd quansec-ui && npm run dev
+cd quanseq-ui && npm run dev
 ```
 
 Then open **`https://localhost:8444/tls-portal`**. The certificate is signed by
-the development CA at `~/quansec-certs/ca.crt`; trust it or accept the warning.
+the development CA at `~/quanseq-certs/ca.crt`; trust it or accept the warning.
 
 ### Enforcement check
 
 ```bash
-bash quansec/scripts/test-pqc-tls.sh          # scripted
-cd quansec && python3 -m pytest tests/test_tls_enforcement.py -q
+bash quanseq/scripts/test-pqc-tls.sh          # scripted
+cd quanseq && python3 -m pytest tests/test_tls_enforcement.py -q
 ```
 
 The pytest suite skips itself if the listener is down — a missing data plane is
@@ -233,7 +233,7 @@ from an empty table.
 4. **`failed_handshakes` includes stale probe rows** from before the listener
    was first started. Honest data, misleading impression; needs a time window.
 5. **Development PKI only.** The CA private key sits on disk beside the server
-   key in `~/quansec-certs`. Not production PKI.
+   key in `~/quanseq-certs`. Not production PKI.
 6. **Not implemented**: `events.py`, the validation lab (`attacks.py`), policy
    rollback via `tls_policy_history`, the alert engine, WebSocket ticket
    authentication. The tables exist; the code does not. Portal pages for Docs,
@@ -253,10 +253,10 @@ from an empty table.
 ## 7. Test coverage
 
 ```bash
-cd quansec && python3 -m pytest tests/test_tls_enforcement.py tests/test_tls_api.py -q
+cd quanseq && python3 -m pytest tests/test_tls_enforcement.py tests/test_tls_api.py -q
 # 45 passed
 
-cd quansec-ui && npx tsc --noEmit && npm run build
+cd quanseq-ui && npx tsc --noEmit && npm run build
 ```
 
 `test_tls_enforcement.py` opens real TLS connections — positive hybrid,

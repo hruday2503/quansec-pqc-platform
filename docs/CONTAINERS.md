@@ -25,7 +25,7 @@ Docker socket. The root host agent accepts only these structured operations:
 It has no general command endpoint. It preserves the existing StrongSwan
 identities, addresses, traffic selectors, and PSK; only proposal lines change.
 For SSH it changes only `KexAlgorithms`. Both configurations are validated and
-restored if reload fails. The old `/tmp/quansec` simulation paths are gone.
+restored if reload fails. The old `/tmp/quanseq` simulation paths are gone.
 
 ## Prerequisites
 
@@ -51,8 +51,8 @@ From the repository root:
 ```bash
 chmod +x deploy/install-host-agent.sh
 ./deploy/install-host-agent.sh
-sudo systemctl enable --now quansec-pqc-sshd.service
-sudo systemctl status quansec-policy-agent quansec-pqc-sshd --no-pager
+sudo systemctl enable --now quanseq-pqc-sshd.service
+sudo systemctl status quanseq-policy-agent quanseq-pqc-sshd --no-pager
 ```
 
 The PQC sshd unit will fail closed until `/opt/openssh-pqc` is genuinely
@@ -99,7 +99,7 @@ StrongSwan and the collector recovers under its restart policy.
 ## Verification
 
 ```bash
-python3 -m unittest quansec/tests/test_container_boundaries.py
-python3 -m compileall -q quansec
+python3 -m unittest quanseq/tests/test_container_boundaries.py
+python3 -m compileall -q quanseq
 docker compose config --quiet
 ```

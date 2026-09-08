@@ -3,7 +3,7 @@
 The platform's own security posture — authentication, authorisation, secret
 handling, threat model, and what must be fixed before production.
 
-> QUANSEC manages cryptographic policy on live systems. Compromising it means
+> QUANSEQ manages cryptographic policy on live systems. Compromising it means
 > being able to downgrade every tunnel and session it controls. It is a
 > high-value target and must be treated as one.
 
@@ -36,7 +36,7 @@ in the database is an auth failure rather than a 500.
 
 **No password policy is enforced.** No minimum length, complexity or rotation.
 `seed_admin.py` defaults to `CHANGE_ME` when `ADMIN_PASSWORD` is unset, and
-`setup_backend.sh` defaults to `Admin@QuanSec2024!`. Both are printed to the
+`setup_backend.sh` defaults to `Admin@QuanSeq2024!`. Both are printed to the
 terminal on completion. Change them.
 
 ### 1.2 JWT
@@ -158,19 +158,19 @@ security boundary.** Do not rely on it for multi-tenancy.
 ### 3.1 What is in the repository
 
 `.gitignore` excludes `.env`, `*.pem`, `*_key`, `*_key.pub`, `*-cert.pub`,
-`id_ed25519*`, `id_rsa*`, `quansec_ca`, `quansec_ca.pub`, `known_hosts`.
+`id_ed25519*`, `id_rsa*`, `quanseq_ca`, `quanseq_ca.pub`, `known_hosts`.
 
 **Committed values that must be changed:**
 
 | Location | Value | Action |
 |---|---|---|
-| `quansec/two-vm-configs/vm-a-swanctl.conf` | `secret = quansec-shared-key-2026` | Replace with a high-entropy PSK |
+| `quanseq/two-vm-configs/vm-a-swanctl.conf` | `secret = quanseq-shared-key-2026` | Replace with a high-entropy PSK |
 | `vm-b/swanctl/swanctl.conf` | `secret = YOUR_IPSEC_PSK_HERE` | Placeholder — replace |
-| `quansec/strongswan/swanctl.conf` | `secret = "change-this-psk-in-production"` | Template — replace |
+| `quanseq/strongswan/swanctl.conf` | `secret = "change-this-psk-in-production"` | Template — replace |
 | `core/config.py` | `JWT_SECRET` default `change-this-in-production` | Set in `.env` |
 | `core/config.py` | `DATABASE_URL` default password `CHANGE_ME` | Set in `.env` |
-| `setup_backend.sh` | `ADMIN_PASSWORD` default `Admin@QuanSec2024!` | Set in `.env` |
-| `provision_postgres.sh` | `DB_PASS="quansec_secret"` | Change before use |
+| `setup_backend.sh` | `ADMIN_PASSWORD` default `Admin@QuanSeq2024!` | Set in `.env` |
+| `provision_postgres.sh` | `DB_PASS="quanseq_secret"` | Change before use |
 | `seed_admin.py` | `ADMIN_PASSWORD` default `CHANGE_ME` | Pass via env |
 
 The IPsec PSKs are the most serious: a committed pre-shared key means anyone with
@@ -179,7 +179,7 @@ non-lab deployment**, and prefer `auth = pubkey` with X.509 over PSK.
 
 ### 3.2 The CA private key
 
-`~/quansec-ca/quansec_ca`, unencrypted, mode 600.
+`~/quanseq-ca/quanseq_ca`, unencrypted, mode 600.
 
 **This key can mint SSH access to every server trusting the CA.** It is the
 highest-value secret in the system. Production options, in increasing order of
@@ -304,7 +304,7 @@ module-level constants.**
 
 ### 5.3 Dev mode is a silent no-op
 
-Without the daemon present, both engines write to `/tmp/quansec/` and return
+Without the daemon present, both engines write to `/tmp/quanseq/` and return
 `dev_mode: true`. This is deliberate — it makes the platform demonstrable — but
 it means **a policy apply can succeed without changing anything.**
 
@@ -390,13 +390,13 @@ location /metrics {
 
 ### 6.5 The TLS transport service
 
-QUANSEC runs its own TLS 1.3 service on port 8443 and connects to it as a client.
+QUANSEQ runs its own TLS 1.3 service on port 8443 and connects to it as a client.
 Its security properties, and their limits:
 
 **What genuinely holds.** TLS 1.3 is pinned as both the minimum and maximum
 version, so a TLS 1.2 client is rejected at the handshake. Clients verify the
 server certificate chain and hostname (`CERT_REQUIRED` plus `check_hostname`).
-With `QUANSEC_TLS_MTLS=true` the server requires a client certificate signed by
+With `QUANSEQ_TLS_MTLS=true` the server requires a client certificate signed by
 the configured CA, and rejects a client that presents none. All four are covered
 by tests that connect over a real socket.
 
@@ -413,7 +413,7 @@ and sends nothing cannot stall other handshakes. Beyond that the service is a
 thread-per-connection design and is not intended for internet exposure.
 
 **Payload confidentiality in logs.** Application payloads are redacted by default
-and only logged when `QUANSEC_TLS_LOG_PAYLOADS=true`. The API never echoes a sent
+and only logged when `QUANSEQ_TLS_LOG_PAYLOADS=true`. The API never echoes a sent
 payload back — `echo_received` reports only that the service answered — so a
 response cannot leak what was sent.
 
@@ -507,8 +507,8 @@ remains unauthenticated.
 
 ### 8.6 Not in scope
 
-QUANSEC does not defend the *managed* protocols against attack — StrongSwan and
-sshd do that. It observes and configures them. A compromise of QUANSEC leads to a
+QUANSEQ does not defend the *managed* protocols against attack — StrongSwan and
+sshd do that. It observes and configures them. A compromise of QUANSEQ leads to a
 downgrade of those protocols, which is why it is a high-value target.
 
 ---
@@ -548,7 +548,7 @@ Ordered by severity.
 
 - [ ] `JWT_SECRET` set to 32+ random bytes in `.env`
 - [ ] Admin password changed from every default; `ADMIN_PASSWORD` not left in shell history
-- [ ] Database password changed from `quansec_secret` / `CHANGE_ME`
+- [ ] Database password changed from `quanseq_secret` / `CHANGE_ME`
 - [ ] IPsec PSKs rotated in **all three** config files
 - [ ] `.env` is mode 600 and not committed
 - [ ] TLS terminated in front of the API; HTTP redirected
@@ -557,7 +557,7 @@ Ordered by severity.
 - [ ] Backend runs as a dedicated non-root service account
 - [ ] `sudoers` entries scoped to exact commands with fixed paths
 - [ ] CA private key passphrase-protected or moved to an HSM
-- [ ] `QUANSEC_TLS_LOG_PAYLOADS` confirmed `false` — it logs message bodies in cleartext
+- [ ] `QUANSEQ_TLS_LOG_PAYLOADS` confirmed `false` — it logs message bodies in cleartext
 - [ ] TLS development PKI regenerated outside the repository, keys mode 600, and **not** reused as production PKI
 - [ ] TLS hybrid status understood as *observational*: a `negotiated_verified` badge is not an enforcement guarantee (see risk #17)
 - [ ] API keys created under operator accounts, never admin

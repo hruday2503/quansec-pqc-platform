@@ -1,6 +1,6 @@
 # API reference
 
-Complete endpoint reference for the QUANSEC backend.
+Complete endpoint reference for the QUANSEQ backend.
 
 **Base URL:** `http://localhost:8000` · **Interactive docs:** `/docs` · **OpenAPI:** `/openapi.json`
 
@@ -58,7 +58,7 @@ The dividing line is *does this change the security posture of a live system*.
 ```bash
 TOKEN=$(curl -s -X POST http://localhost:8000/api/auth/login \
   -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "username=admin@quansec.io&password=$ADMIN_PASSWORD" \
+  -d "username=admin@quanseq.io&password=$ADMIN_PASSWORD" \
   | python3 -c "import sys,json;print(json.load(sys.stdin)['access_token'])")
 
 curl -s http://localhost:8000/api/ipsec/stats -H "Authorization: Bearer $TOKEN"
@@ -90,11 +90,11 @@ OAuth2 password flow. Form-encoded.
 
 ```bash
 curl -X POST localhost:8000/api/auth/login \
-  -d "username=admin@quansec.io&password=<password>"
+  -d "username=admin@quanseq.io&password=<password>"
 ```
 
 ```json
-{"access_token":"eyJ…","token_type":"bearer","role":"admin","email":"admin@quansec.io"}
+{"access_token":"eyJ…","token_type":"bearer","role":"admin","email":"admin@quanseq.io"}
 ```
 
 `401` on bad credentials. A successful login writes an `audit_events` row.
@@ -242,7 +242,7 @@ Policies: `classical`, `pqc-level3`, `pqc-level5`. Apply is **admin**:
 ```
 
 **Check `dev_mode`.** When `true`, StrongSwan is absent and the config was
-written to `/tmp/quansec/swanctl/swanctl.conf` — nothing on the live system
+written to `/tmp/quanseq/swanctl/swanctl.conf` — nothing on the live system
 changed. Also note that existing SAs keep their old proposal until the next
 rekey. Details: [protocols/IPSEC.md §9](protocols/IPSEC.md#9-the-policy-engine).
 
@@ -319,7 +319,7 @@ KEX (falling back to `sshd -T`) and branches. `404` on an unknown name.
 
 ## 7. TLS
 
-The TLS module observes a **real TLS 1.3 service that QUANSEC runs as a separate
+The TLS module observes a **real TLS 1.3 service that QUANSEQ runs as a separate
 process** on its own port. Every value below was read off a live socket.
 
 > **Before quoting any post-quantum figure from these endpoints:** hybrid key
@@ -407,7 +407,7 @@ Body is optional: `{"message": "..."}`, at most 4096 bytes when UTF-8 encoded.
   "negotiated_group": null,                              // see below
   "negotiated_group_source": "unavailable-python-ssl",
   "mtls_used": false,
-  "peer_cert": { "cn": "localhost", "issuer_cn": "QUANSEC TLS Development Root CA",
+  "peer_cert": { "cn": "localhost", "issuer_cn": "QUANSEQ TLS Development Root CA",
                  "not_before": "...", "not_after": "...",
                  "san": ["DNS:localhost", "IP Address:127.0.0.1"] },
   "cert_verified": true,
@@ -484,7 +484,7 @@ change nothing while implying enforcement.
 
 ```json
 // GET /api/ssh/zt/events
-[{"event_time":"2026-07-29T14:19:02Z","identity":"alice@quansec.io",
+[{"event_time":"2026-07-29T14:19:02Z","identity":"alice@quanseq.io",
   "cert_serial":"3","ca_fingerprint":"SHA256:Xk9…","source_ip":"192.168.1.6",
   "principal":"hd6441","result":"accepted","reason":"ok"}]
 ```
@@ -505,16 +505,16 @@ intended posture, not live reads of `sshd_config`.
 ### `GET /api/ssh/ca/info`
 
 ```json
-{"ca_public_key":"ssh-ed25519 AAAAC3… QUANSEC CA",
- "fingerprint":"256 SHA256:Xk9… QUANSEC CA (ED25519)",
- "trusted_by":"all QUANSEC PQC SSH servers"}
+{"ca_public_key":"ssh-ed25519 AAAAC3… QUANSEQ CA",
+ "fingerprint":"256 SHA256:Xk9… QUANSEQ CA (ED25519)",
+ "trusted_by":"all QUANSEQ PQC SSH servers"}
 ```
 
 ### `POST /api/ssh/ca/issue` — **admin**
 
 ```json
 {"public_key":"ssh-ed25519 AAAAC3NzaC1… alice@laptop",
- "identity":"alice@quansec.io","principals":"hd6441","valid_hours":8}
+ "identity":"alice@quanseq.io","principals":"hd6441","valid_hours":8}
 ```
 
 `valid_hours` is bounded 1–168 by Pydantic. The response includes the signed
@@ -626,7 +626,7 @@ alert stays until acknowledged.
           "desc":"PQC only — classical refused"},
  "tls":{"mode":"fail-closed","enforceable":false,"groups":"X25519MLKEM768",
         "desc":"PQC only — classical refused",
-        "note":"Advisory only. QUANSEC cannot enforce TLS 1.3 group selection through Python's ssl module..."},
+        "note":"Advisory only. QUANSEQ cannot enforce TLS 1.3 group selection through Python's ssl module..."},
  "recommendation":"fail-closed for maximum quantum safety; fail-open only where uptime outweighs downgrade risk"}
 ```
 
@@ -655,7 +655,7 @@ bindings, or a terminating proxy.
 | `GET` | `/api/siem/cef` |
 
 ```
-CEF:0|QUANSEC|PQC-Platform|1.0|zt_rejected|Zt Rejected|8|rt=2026-07-29T14:19:02+00:00 act=zt_rejected outcome=ssh-zero-trust msg=identity=alice@quansec.io src=192.168.1.6 reason=expired
+CEF:0|QUANSEQ|PQC-Platform|1.0|zt_rejected|Zt Rejected|8|rt=2026-07-29T14:19:02+00:00 act=zt_rejected outcome=ssh-zero-trust msg=identity=alice@quanseq.io src=192.168.1.6 reason=expired
 ```
 
 CEF severities: attacks 6, policy changes 5, key revocation 6, key creation 4,
@@ -674,29 +674,29 @@ events. Fixing it is a one-word change in `protocols/siem/router.py`.
 not carry bearer tokens); restrict at the network layer.
 
 ```
-# HELP quansec_ipsec_tunnels_total Total IPsec tunnels
-# TYPE quansec_ipsec_tunnels_total gauge
-quansec_ipsec_tunnels_total 1
-quansec_ipsec_tunnels_established 1
-quansec_ipsec_tunnels_pqc 1
-quansec_ipsec_pqc_coverage_percent 100.0
-quansec_ipsec_bytes_in_total 8432
-quansec_ipsec_bytes_out_total 8432
-quansec_tls_handshakes_total 42
-quansec_tls_handshakes_successful 38
-quansec_tls_handshakes_pqc 0
-quansec_tls_pqc_coverage_percent 0.0
-quansec_tls_handshake_duration_ms 4.31
-quansec_tls_hybrid_verifications_total 0
-quansec_tls_hybrid_enforced 0
-quansec_ssh_sessions_total 3
-quansec_ssh_sessions_active 1
-quansec_ssh_sessions_pqc 1
-quansec_ssh_pqc_coverage_percent 100.0
-quansec_ssh_bytes_sent_total 14208
-quansec_ssh_bytes_received_total 9112
-quansec_zt_auth_accepted_total 38
-quansec_zt_auth_rejected_total 4
+# HELP quanseq_ipsec_tunnels_total Total IPsec tunnels
+# TYPE quanseq_ipsec_tunnels_total gauge
+quanseq_ipsec_tunnels_total 1
+quanseq_ipsec_tunnels_established 1
+quanseq_ipsec_tunnels_pqc 1
+quanseq_ipsec_pqc_coverage_percent 100.0
+quanseq_ipsec_bytes_in_total 8432
+quanseq_ipsec_bytes_out_total 8432
+quanseq_tls_handshakes_total 42
+quanseq_tls_handshakes_successful 38
+quanseq_tls_handshakes_pqc 0
+quanseq_tls_pqc_coverage_percent 0.0
+quanseq_tls_handshake_duration_ms 4.31
+quanseq_tls_hybrid_verifications_total 0
+quanseq_tls_hybrid_enforced 0
+quanseq_ssh_sessions_total 3
+quanseq_ssh_sessions_active 1
+quanseq_ssh_sessions_pqc 1
+quanseq_ssh_pqc_coverage_percent 100.0
+quanseq_ssh_bytes_sent_total 14208
+quanseq_ssh_bytes_received_total 9112
+quanseq_zt_auth_accepted_total 38
+quanseq_zt_auth_rejected_total 4
 ```
 
 Each metric block is independently wrapped in `try/except`, so one failing query
@@ -706,8 +706,8 @@ Scrape config:
 
 ```yaml
 scrape_configs:
-  - job_name: quansec
-    static_configs: [{targets: ['quansec-host:8000']}]
+  - job_name: quanseq
+    static_configs: [{targets: ['quanseq-host:8000']}]
 ```
 
 ---
@@ -721,10 +721,10 @@ ws://localhost:8000/api/ws/live
 On accept:
 
 ```json
-{"type":"connected","message":"QUANSEC live feed connected","channel":"quansec:live"}
+{"type":"connected","message":"QUANSEQ live feed connected","channel":"quanseq:live"}
 ```
 
-Then every message published to `quansec:live`:
+Then every message published to `quanseq:live`:
 
 ```json
 // collector summary, every poll
