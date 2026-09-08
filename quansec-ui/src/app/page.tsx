@@ -109,13 +109,6 @@ export default function LandingPage() {
             </div>
           </Link>
         </div>
-
-        {/* Footer note */}
-        <div className="text-center mt-14">
-          <p className="text-xs font-mono-display" style={{ color: "var(--text-tertiary)" }}>
-            Samsung PRISM Research · NIST FIPS 203 · CNSA 2.0
-          </p>
-        </div>
       </div>
     </div>
   );
