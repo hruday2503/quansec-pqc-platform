@@ -49,9 +49,9 @@ export default function AttacksPage() {
         <div className="text-[11px] font-mono-display tracking-[0.18em] uppercase mb-1" style={{ color: "var(--text-tertiary)" }}>
           Cryptanalysis
         </div>
-        <h1 className="text-2xl font-bold tracking-tight">Attack Simulation Lab</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Attack Lab</h1>
         <p className="text-sm mt-1" style={{ color: "var(--text-secondary)" }}>
-          Real cryptographic attacks run against the current tunnel policy
+          Cryptographic attack techniques evaluated against the active tunnel policy
         </p>
       </div>
 

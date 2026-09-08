@@ -4,15 +4,14 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Terminal, ArrowRight, Wifi, WifiOff, ShieldCheck } from "lucide-react";
 import { authHeaders } from "@/lib/auth-fetch";
-
-const API_BASE = process.env.NEXT_PUBLIC_QUANSEC_API || "http://localhost:8000";
+import { mockFetch } from "@/lib/mock/fetch";
 
 export default function SshPortalOverview() {
   const [stats, setStats] = useState<{ active: number; pqc_enabled: number; pqc_coverage: number } | null>(null);
 
   const load = async () => {
     try {
-      const response = await fetch(`${API_BASE}/api/ssh/stats`, {
+      const response = await mockFetch(`/api/ssh/stats`, {
         headers: authHeaders(),
       });
       if (!response.ok) {

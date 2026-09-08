@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { Panel, PanelHeader } from "@/components/ui-primitives";
-import { ShieldCheck, Copy, Check, Download, KeyRound, AlertTriangle, Fingerprint } from "lucide-react";
+import { ShieldCheck, Copy, Check, Download, AlertTriangle, Fingerprint } from "lucide-react";
 import { authHeaders as bearerHeaders } from "@/lib/auth-fetch";
+import { mockFetch } from "@/lib/mock/fetch";
 
-const API_BASE = process.env.NEXT_PUBLIC_QUANSEC_API || "http://localhost:8000";
 function authHeaders(json = false): HeadersInit {
   // Authorization comes from the in-memory access token; see
   // src/lib/auth-fetch.ts. Nothing is read from localStorage.
@@ -34,8 +34,8 @@ export default function CertificatesPage() {
   const load = async () => {
     try {
       const [ca, list] = await Promise.all([
-        fetch(`${API_BASE}/api/ssh/ca/info`, { headers: authHeaders() }).then((r) => r.json()),
-        fetch(`${API_BASE}/api/ssh/ca/issued`, { headers: authHeaders() }).then((r) => r.json()),
+        mockFetch(`/api/ssh/ca/info`, { headers: authHeaders() }).then((r) => r.json()),
+        mockFetch(`/api/ssh/ca/issued`, { headers: authHeaders() }).then((r) => r.json()),
       ]);
       setCaInfo(ca);
       setIssued(Array.isArray(list) ? list : []);
@@ -46,7 +46,7 @@ export default function CertificatesPage() {
   const issue = async () => {
     setError(""); setResult(null); setIssuing(true);
     try {
-      const res = await fetch(`${API_BASE}/api/ssh/ca/issue`, {
+      const res = await mockFetch(`/api/ssh/ca/issue`, {
         method: "POST", headers: authHeaders(true),
         body: JSON.stringify({ public_key: publicKey.trim(), identity: identity.trim(), principals: principals.trim(), valid_hours: hours }),
       });

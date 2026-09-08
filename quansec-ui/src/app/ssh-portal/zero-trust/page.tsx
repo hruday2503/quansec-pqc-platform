@@ -4,8 +4,7 @@ import { useEffect, useState } from "react";
 import { Panel, PanelHeader } from "@/components/ui-primitives";
 import { ShieldCheck, ShieldX, KeyRound, Clock, UserCheck, Ban, Fingerprint } from "lucide-react";
 import { authHeaders } from "@/lib/auth-fetch";
-
-const API_BASE = process.env.NEXT_PUBLIC_QUANSEC_API || "http://localhost:8000";
+import { mockFetch } from "@/lib/mock/fetch";
 
 interface ZtEvent {
   event_time: string; identity: string; cert_serial: string; ca_fingerprint: string;
@@ -28,9 +27,9 @@ export default function ZeroTrustPage() {
   const load = async () => {
     try {
       const [e, s, p] = await Promise.all([
-        fetch(`${API_BASE}/api/ssh/zt/events`, { headers: authHeaders() }).then((r) => r.json()),
-        fetch(`${API_BASE}/api/ssh/zt/status`, { headers: authHeaders() }).then((r) => r.json()),
-        fetch(`${API_BASE}/api/ssh/zt/policy`, { headers: authHeaders() }).then((r) => r.json()),
+        mockFetch(`/api/ssh/zt/events`, { headers: authHeaders() }).then((r) => r.json()),
+        mockFetch(`/api/ssh/zt/status`, { headers: authHeaders() }).then((r) => r.json()),
+        mockFetch(`/api/ssh/zt/policy`, { headers: authHeaders() }).then((r) => r.json()),
       ]);
       setEvents(Array.isArray(e) ? e : []);
       setStatus(s); setPolicy(p);
@@ -104,7 +103,7 @@ export default function ZeroTrustPage() {
                 <tr><td colSpan={6} className="px-4 py-10 text-center text-sm" style={{ color: "var(--text-primary)" }}>No certificate auth events yet. Log in with a certificate to populate the trail.</td></tr>
               )}
               {events.map((e, i) => (
-                <tr key={i} className="border-b" style={{ borderColor: "var(--border-hairline)" }}>
+                <tr key={`${e.cert_serial}-${e.event_time}-${i}`} className="border-b" style={{ borderColor: "var(--border-hairline)" }}>
                   <td className="px-4 py-3 font-mono-display" style={{ color: "var(--text-primary)" }}>{e.event_time ? new Date(e.event_time).toLocaleTimeString() : "—"}</td>
                   <td className="px-4 py-3 font-mono-display" style={{ color: "var(--lattice-violet)" }}>
                     <span className="flex items-center gap-1.5"><Fingerprint size={11} />{e.identity}</span>

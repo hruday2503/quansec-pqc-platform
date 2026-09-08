@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 import { Panel, PanelHeader } from "@/components/ui-primitives";
 import { Check, X, Calendar, Loader2 } from "lucide-react";
 import { authHeaders as bearerHeaders } from "@/lib/auth-fetch";
+import { mockFetch } from "@/lib/mock/fetch";
 
-const API_BASE = process.env.NEXT_PUBLIC_QUANSEC_API || "http://localhost:8000";
 function authHeaders(json = false): HeadersInit {
   // Authorization comes from the in-memory access token; see
   // src/lib/auth-fetch.ts. Nothing is read from localStorage.
@@ -30,8 +30,8 @@ export default function SshPolicyPage() {
 
   const load = async () => {
     const [p, cmp] = await Promise.all([
-      fetch(`${API_BASE}/api/ssh/policies`, { headers: authHeaders() }).then((r) => r.json()),
-      fetch(`${API_BASE}/api/ssh/policies/compare`, { headers: authHeaders() }).then((r) => r.json()),
+      mockFetch(`/api/ssh/policies`, { headers: authHeaders() }).then((r) => r.json()),
+      mockFetch(`/api/ssh/policies/compare`, { headers: authHeaders() }).then((r) => r.json()),
     ]);
     setPolicies(Array.isArray(p) ? p : []);
     setRows(cmp.comparison || []);
@@ -43,7 +43,7 @@ export default function SshPolicyPage() {
   const apply = async (name: string) => {
     setApplying(name); setToast(null);
     try {
-      const res = await fetch(`${API_BASE}/api/ssh/policies/apply`, {
+      const res = await mockFetch(`/api/ssh/policies/apply`, {
         method: "POST", headers: authHeaders(true), body: JSON.stringify({ policy_name: name }),
       });
       const data = await res.json();

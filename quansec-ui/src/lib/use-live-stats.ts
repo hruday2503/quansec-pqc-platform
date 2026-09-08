@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { quansec, IPsecStats, IPsecTunnel } from "@/lib/api";
 
 export function useLiveStats(intervalMs = 5000) {

@@ -174,6 +174,7 @@ export default function DocsPage() {
                 ["GET", "/api/ipsec/tunnels", "Detailed tunnel list"],
                 ["GET", "/api/ipsec/policies/compare", "Classical vs PQC comparison"],
                 ["POST", "/api/ipsec/policies/apply", "Switch tunnel policy"],
+                ["POST", "/api/ipsec/attacks/{name}", "Run an attack technique"],
                 ["GET", "/api/ws/live", "WebSocket live event stream"],
               ].map(([method, path, desc]) => (
                 <tr key={path} className="border-t" style={{ borderColor: "var(--border-hairline)" }}>

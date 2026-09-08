@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 import { Panel, PanelHeader } from "@/components/ui-primitives";
 import { Copy, Check, Plus, Trash2, X, KeyRound, AlertTriangle } from "lucide-react";
 import { authHeaders as bearerHeaders } from "@/lib/auth-fetch";
+import { mockFetch } from "@/lib/mock/fetch";
 
-const API_BASE = process.env.NEXT_PUBLIC_QUANSEC_API || "http://localhost:8000";
 function authHeaders(json = false): HeadersInit {
   // Authorization comes from the in-memory access token; see
   // src/lib/auth-fetch.ts. Nothing is read from localStorage.
@@ -26,7 +26,7 @@ export default function SshKeysPage() {
 
   const load = async () => {
     try {
-      const r = await fetch(`${API_BASE}/api/keys`, { headers: authHeaders() });
+      const r = await mockFetch(`/api/keys`, { headers: authHeaders() });
       const data = await r.json();
       setKeys(Array.isArray(data) ? data : []);
     } catch { /* ignore */ }
@@ -37,7 +37,7 @@ export default function SshKeysPage() {
     if (!name.trim()) return;
     setCreating(true);
     try {
-      const r = await fetch(`${API_BASE}/api/keys`, { method: "POST", headers: authHeaders(true), body: JSON.stringify({ name: name.trim() }) });
+      const r = await mockFetch(`/api/keys`, { method: "POST", headers: authHeaders(true), body: JSON.stringify({ name: name.trim() }) });
       const data = await r.json();
       setRevealed(data.api_key);
       setName(""); setShowForm(false);
@@ -46,7 +46,7 @@ export default function SshKeysPage() {
   };
 
   const revoke = async (id: number) => {
-    await fetch(`${API_BASE}/api/keys/${id}`, { method: "DELETE", headers: authHeaders() });
+    await mockFetch(`/api/keys/${id}`, { method: "DELETE", headers: authHeaders() });
     await load();
   };
 

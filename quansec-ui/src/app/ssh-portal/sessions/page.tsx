@@ -4,8 +4,7 @@ import { useEffect, useState } from "react";
 import { Panel, PanelHeader, PqcBadge, StateBadge, AttackResultBadge } from "@/components/ui-primitives";
 import { Terminal, Radio, Atom, Clock, Loader2 } from "lucide-react";
 import { authHeaders } from "@/lib/auth-fetch";
-
-const API_BASE = process.env.NEXT_PUBLIC_QUANSEC_API || "http://localhost:8000";
+import { mockFetch } from "@/lib/mock/fetch";
 
 interface SshStats {
   total_connections: number;
@@ -41,8 +40,8 @@ export default function SshPage() {
   const load = async () => {
     try {
       const [s, c] = await Promise.all([
-        fetch(`${API_BASE}/api/ssh/stats`, { headers: authHeaders() }).then((r) => r.json()),
-        fetch(`${API_BASE}/api/ssh/connections`, { headers: authHeaders() }).then((r) => r.json()),
+        mockFetch(`/api/ssh/stats`, { headers: authHeaders() }).then((r) => r.json()),
+        mockFetch(`/api/ssh/connections`, { headers: authHeaders() }).then((r) => r.json()),
       ]);
       setStats(s);
       setConns(Array.isArray(c) ? c : []);
@@ -60,7 +59,7 @@ export default function SshPage() {
   const runAttack = async (id: string) => {
     setRunning(id);
     try {
-      const res = await fetch(`${API_BASE}/api/ssh/attacks/${id}`, {
+      const res = await mockFetch(`/api/ssh/attacks/${id}`, {
         method: "POST",
         headers: authHeaders(),
       }).then((r) => r.json());
@@ -141,7 +140,7 @@ export default function SshPage() {
 
       {/* Attacks */}
       <Panel>
-        <PanelHeader eyebrow="Cryptanalysis" title="SSH Attack Simulations" />
+        <PanelHeader eyebrow="Cryptanalysis" title="SSH Attack Lab" />
         <div className="divide-y" style={{ borderColor: "var(--border-hairline)" }}>
           {ATTACKS.map((a) => {
             const Icon = a.icon;

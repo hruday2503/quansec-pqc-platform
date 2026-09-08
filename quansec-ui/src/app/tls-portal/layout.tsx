@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
-import { Globe, LayoutGrid, FileBadge, LogOut, ShieldHalf, GitCompareArrows, Network, KeyRound } from "lucide-react";
+import { Globe, LayoutGrid, FileBadge, LogOut, ShieldHalf, GitCompareArrows, Network, KeyRound, Gauge } from "lucide-react";
 
 const NAV = [
   { href: "/tls-portal", label: "Overview", icon: LayoutGrid },
@@ -12,6 +12,7 @@ const NAV = [
   { href: "/tls-portal/sessions", label: "TLS Sessions", icon: Network },
   { href: "/tls-portal/certificate", label: "Certificate", icon: FileBadge },
   { href: "/tls-portal/policy", label: "Policy", icon: GitCompareArrows },
+  { href: "/tls-portal/readiness", label: "Readiness", icon: Gauge },
 ];
 
 function TlsSidebar() {

@@ -1,5 +1,8 @@
 // lib/api.ts — QUANSEC API client
 
+import { SHOWCASE_MODE } from "@/lib/mock/mode";
+import { MockQuansecClient } from "@/lib/mock/client";
+
 const API_BASE = process.env.NEXT_PUBLIC_QUANSEC_API || "http://localhost:8000";
 
 export interface IPsecStats {
@@ -859,4 +862,6 @@ class QuansecClient {
   }
 }
 
-export const quansec = new QuansecClient();
+export const quansec: QuansecClient = SHOWCASE_MODE
+  ? (new MockQuansecClient() as unknown as QuansecClient)
+  : new QuansecClient();

@@ -114,7 +114,7 @@ export default function SshDocsPage() {
                 ["GET", "/api/ssh/connections", "Active SSH sessions with KEX"],
                 ["GET", "/api/ssh/policies/compare", "Classical vs hybrid comparison"],
                 ["POST", "/api/ssh/policies/apply", "Switch server KEX policy"],
-                ["POST", "/api/ssh/attacks/{name}", "Run attack simulation"],
+                ["POST", "/api/ssh/attacks/{name}", "Run an attack technique"],
               ].map(([m, path, desc]) => (
                 <tr key={path} className="border-t" style={{ borderColor: "var(--border-hairline)" }}>
                   <td className="px-5 py-3 w-16">

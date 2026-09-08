@@ -1,11 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Panel, PanelHeader } from "@/components/ui-primitives";
-import { Gauge, TrendingUp, ShieldCheck, X, Check } from "lucide-react";
+import { Panel } from "@/components/ui-primitives";
+import { Gauge, ShieldCheck, X, Check } from "lucide-react";
 import { authHeaders } from "@/lib/auth-fetch";
-
-const API_BASE = process.env.NEXT_PUBLIC_QUANSEC_API || "http://localhost:8000";
+import { mockFetch } from "@/lib/mock/fetch";
 
 interface Factors {
   coverage: number;
@@ -39,8 +38,8 @@ export default function ReadinessScorePage() {
   const load = async () => {
     try {
       const [s, o] = await Promise.all([
-        fetch(`${API_BASE}/api/scoring/${PROTOCOL}`, { headers: authHeaders() }).then((r) => r.json()),
-        fetch(`${API_BASE}/api/scoring/overall`, { headers: authHeaders() }).then((r) => r.json()),
+        mockFetch(`/api/scoring/${PROTOCOL}`, { headers: authHeaders() }).then((r) => r.json()),
+        mockFetch(`/api/scoring/overall`, { headers: authHeaders() }).then((r) => r.json()),
       ]);
       setScore(s); setOverall(o);
     } catch { /* ignore */ }
@@ -109,7 +108,7 @@ export default function ReadinessScorePage() {
               <Gauge size={20} style={{ color: ACCENT }} />
               <div>
                 <div className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>Overall Platform Score</div>
-                <div className="text-xs" style={{ color: "var(--text-primary)" }}>IPsec + SSH combined</div>
+                <div className="text-xs" style={{ color: "var(--text-primary)" }}>IPsec + SSH + TLS combined</div>
               </div>
             </div>
             <div className="flex items-center gap-4">

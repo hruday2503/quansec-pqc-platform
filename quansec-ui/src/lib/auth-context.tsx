@@ -23,16 +23,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = quansec.loadToken();
-    if (token) {
-      quansec
-        .me()
-        .then(setUser)
-        .catch(() => quansec.clearToken())
-        .finally(() => setLoading(false));
-    } else {
-      setLoading(false);
-    }
+    // restore() exchanges the refresh cookie for a new access token, so a
+    // session survives a hard reload. loadToken() only reads the in-memory
+    // token, which is always empty right after a fresh page load.
+    quansec
+      .restore()
+      .then((ok) => (ok ? quansec.me().then(setUser) : undefined))
+      .catch(() => quansec.clearToken())
+      .finally(() => setLoading(false));
   }, []);
 
   const login = async (email: string, password: string, portal?: string) => {

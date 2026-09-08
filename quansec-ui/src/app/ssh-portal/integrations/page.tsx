@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { Panel, PanelHeader } from "@/components/ui-primitives";
 import { ShieldCheck, ShieldAlert, Download, Copy, Check, Radio } from "lucide-react";
 import { authHeaders as bearerHeaders } from "@/lib/auth-fetch";
+import { mockFetch } from "@/lib/mock/fetch";
+import { SHOWCASE_MODE } from "@/lib/mock/mode";
 
 const API_BASE = process.env.NEXT_PUBLIC_QUANSEC_API || "http://localhost:8000";
 function authHeaders(json = false): HeadersInit {
@@ -31,7 +33,7 @@ export default function IntegrationsPage() {
 
   const load = async () => {
     try {
-      const d = await fetch(`${API_BASE}/api/failmode`, { headers: authHeaders() }).then((r) => r.json());
+      const d = await mockFetch(`/api/failmode`, { headers: authHeaders() }).then((r) => r.json());
       setFailmode(d[PROTOCOL]);
     } catch { /* ignore */ }
   };
@@ -40,7 +42,7 @@ export default function IntegrationsPage() {
   const toggle = async (mode: string) => {
     setApplying(true);
     try {
-      await fetch(`${API_BASE}/api/failmode/set`, {
+      await mockFetch(`/api/failmode/set`, {
         method: "POST", headers: authHeaders(true),
         body: JSON.stringify({ protocol: PROTOCOL, mode }),
       });
@@ -51,6 +53,23 @@ export default function IntegrationsPage() {
   const copyEndpoint = (url: string) => {
     navigator.clipboard.writeText(url);
     setCopied(url); setTimeout(() => setCopied(null), 2000);
+  };
+
+  const fetchEndpoint = (fmt: string, url: string) => {
+    if (!SHOWCASE_MODE) {
+      window.open(url, "_blank", "noreferrer");
+      return;
+    }
+    const sample: Record<string, string> = {
+      CEF: `CEF:0|QUANSEC|SSH|1.0|policy.apply|Policy applied: hybrid-pqc|3|src=10.20.0.1 cs1Label=kex cs1=mlkem768x25519-sha256`,
+      JSON: JSON.stringify({ event: "policy.apply", protocol: "ssh", policy: "hybrid-pqc", occurred_at: new Date().toISOString() }, null, 2),
+      Syslog: `<134>1 ${new Date().toISOString()} quansec ssh - - - policy.apply policy="hybrid-pqc" pqc_enabled=true`,
+    };
+    const blob = new Blob([sample[fmt] ?? ""], { type: "text/plain" });
+    const blobUrl = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = blobUrl; a.download = `quansec-siem-events.${fmt.toLowerCase()}`; a.click();
+    URL.revokeObjectURL(blobUrl);
   };
 
   const isClosed = failmode?.mode === "fail-closed";
@@ -132,9 +151,9 @@ export default function IntegrationsPage() {
                     {copied === row.url ? <Check size={11} style={{ color: "var(--pqc-cyan)" }} /> : <Copy size={11} />}
                     {copied === row.url ? "Copied" : "Copy"}
                   </button>
-                  <a href={row.url} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[10px] font-mono-display focus-ring" style={{ background: "var(--bg-panel)", border: "1px solid var(--border-hairline-bright)", color: "var(--text-primary)" }}>
+                  <button onClick={() => fetchEndpoint(row.fmt, row.url)} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[10px] font-mono-display focus-ring" style={{ background: "var(--bg-panel)", border: "1px solid var(--border-hairline-bright)", color: "var(--text-primary)" }}>
                     <Download size={11} /> Fetch
-                  </a>
+                  </button>
                 </div>
               </div>
             ))}

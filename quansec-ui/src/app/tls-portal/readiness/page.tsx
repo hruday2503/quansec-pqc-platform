@@ -11,7 +11,6 @@ interface Factors {
   algorithm_strength: number;
   downgrade_resistant: boolean;
   hybrid_construction: boolean;
-  zero_trust_events?: number;
 }
 interface Score {
   protocol: string;
@@ -20,9 +19,8 @@ interface Score {
   factors: Factors;
 }
 
-// Which protocol this page scores. Set per copy: "ipsec" or "ssh".
-const PROTOCOL: string = "ipsec";
-const ACCENT = PROTOCOL === "ipsec" ? "var(--pqc-cyan)" : "var(--lattice-violet)";
+const PROTOCOL = "tls";
+const ACCENT = "var(--pqc-cyan)";
 
 function gradeColor(grade: string) {
   if (grade === "A") return "var(--pqc-cyan)";
@@ -31,7 +29,7 @@ function gradeColor(grade: string) {
   return "var(--danger-red)";
 }
 
-export default function ReadinessScorePage() {
+export default function TlsReadinessScorePage() {
   const [score, setScore] = useState<Score | null>(null);
   const [overall, setOverall] = useState<{ overall_score: number; grade: string; cnsa_ready: boolean } | null>(null);
 
@@ -90,13 +88,16 @@ export default function ReadinessScorePage() {
             <FactorBar label="Algorithm Strength" value={score?.factors.algorithm_strength ?? 0} weight="35%" accent={ACCENT} />
             <FactorRow label="Downgrade Resistant" ok={score?.factors.downgrade_resistant ?? false} weight="15%" />
             <FactorRow label="Hybrid Construction" ok={score?.factors.hybrid_construction ?? false} weight="10%" />
-            {score?.factors.zero_trust_events !== undefined && (
-              <div className="flex items-center justify-between pt-2 border-t" style={{ borderColor: "var(--border-hairline)" }}>
-                <span className="text-sm" style={{ color: "var(--text-primary)" }}>Zero Trust events</span>
-                <span className="text-sm font-mono-display font-bold" style={{ color: "var(--lattice-violet)" }}>{score.factors.zero_trust_events}</span>
-              </div>
-            )}
           </div>
+          {/* Downgrade resistance is honestly false for TLS: Python's ssl
+              module cannot select TLS 1.3 groups, so a classical-only client
+              still completes a handshake. Stated rather than hidden. */}
+          {score && !score.factors.downgrade_resistant && (
+            <p className="mt-4 pt-3 border-t text-[11px] leading-relaxed" style={{ borderColor: "var(--border-hairline)", color: "var(--text-tertiary)" }}>
+              Downgrade resistance scores zero because hybrid key exchange is not
+              enforced on this runtime — a classical-only client can still connect.
+            </p>
+          )}
         </Panel>
       </div>
 

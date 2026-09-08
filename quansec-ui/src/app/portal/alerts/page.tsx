@@ -4,8 +4,7 @@ import { useEffect, useState } from "react";
 import { Panel, PanelHeader } from "@/components/ui-primitives";
 import { Bell, BellOff, AlertTriangle, ShieldAlert, Check } from "lucide-react";
 import { authHeaders } from "@/lib/auth-fetch";
-
-const API_BASE = process.env.NEXT_PUBLIC_QUANSEC_API || "http://localhost:8000";
+import { mockFetch } from "@/lib/mock/fetch";
 
 interface Alert {
   id: number; rule: string; severity: string; protocol: string;
@@ -25,7 +24,7 @@ export default function AlertsPage() {
 
   const load = async () => {
     try {
-      const d = await fetch(`${API_BASE}/api/alerts`, { headers: authHeaders() }).then((r) => r.json());
+      const d = await mockFetch(`/api/alerts`, { headers: authHeaders() }).then((r) => r.json());
       setAlerts(d.alerts || []);
       setActiveCount(d.active_count || 0);
     } catch { /* ignore */ }
@@ -33,7 +32,7 @@ export default function AlertsPage() {
   useEffect(() => { load(); const t = setInterval(load, 5000); return () => clearInterval(t); }, []);
 
   const ack = async (id: number) => {
-    await fetch(`${API_BASE}/api/alerts/${id}/ack`, { method: "POST", headers: authHeaders() });
+    await mockFetch(`/api/alerts/${id}/ack`, { method: "POST", headers: authHeaders() });
     await load();
   };
 
