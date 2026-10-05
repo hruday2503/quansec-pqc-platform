@@ -4,7 +4,7 @@ import { AuthProvider } from "@/lib/auth-context";
 import { DEFAULT_THEME, THEME_BOOT_SCRIPT, THEME_COLOR } from "@/lib/theme-script";
 
 export const metadata: Metadata = {
-  title: "QUANSEC — IPsec Security Console",
+  title: "Qryptid — IPsec Security Console",
   description: "Post-quantum IPsec monitoring and policy management",
 };
 

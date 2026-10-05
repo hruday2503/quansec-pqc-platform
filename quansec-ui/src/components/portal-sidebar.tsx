@@ -62,7 +62,7 @@ function Brand({ moduleLabel, accent, accentGlow, accentDim }: { moduleLabel: st
         <ShieldHalf size={18} style={{ color: accent }} strokeWidth={2} />
       </div>
       <div>
-        <div className="text-sm font-extrabold tracking-tight" style={{ color: "var(--text-primary)" }}>QUANSEC</div>
+        <div className="text-sm font-extrabold tracking-tight" style={{ color: "var(--text-primary)" }}>QRYPTID</div>
         <div className="text-[10px] font-mono-display font-semibold tracking-wider" style={{ color: "var(--text-tertiary)" }}>{moduleLabel}</div>
       </div>
     </div>
@@ -171,7 +171,7 @@ export function PortalSidebar({
             <ShieldHalf size={16} style={{ color: accent }} strokeWidth={2} />
           </div>
           <div>
-            <div className="text-xs font-extrabold tracking-tight" style={{ color: "var(--text-primary)" }}>QUANSEC</div>
+            <div className="text-xs font-extrabold tracking-tight" style={{ color: "var(--text-primary)" }}>QRYPTID</div>
             <div className="text-[9px] font-mono-display font-semibold tracking-wider" style={{ color: "var(--text-tertiary)" }}>{moduleLabel}</div>
           </div>
         </div>

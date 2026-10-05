@@ -82,7 +82,7 @@ export default function CertificatesPage() {
         <Panel className="mb-6 px-5 py-4">
           <div className="flex items-center gap-2 mb-2">
             <Fingerprint size={15} style={{ color: "var(--lattice-violet)" }} />
-            <span className="text-xs font-mono-display font-bold uppercase tracking-wider" style={{ color: "var(--text-primary)" }}>QUANSEC CA fingerprint</span>
+            <span className="text-xs font-mono-display font-bold uppercase tracking-wider" style={{ color: "var(--text-primary)" }}>QRYPTID CA fingerprint</span>
           </div>
           <div className="text-xs font-mono-display break-all" style={{ color: "var(--text-primary)" }}>{caInfo.fingerprint}</div>
         </Panel>

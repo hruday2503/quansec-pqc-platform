@@ -68,7 +68,7 @@ export default function IntegrationsPage() {
     const blob = new Blob([sample[fmt] ?? ""], { type: "text/plain" });
     const blobUrl = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = blobUrl; a.download = `quansec-siem-events.${fmt.toLowerCase()}`; a.click();
+    a.href = blobUrl; a.download = `qryptid-siem-events.${fmt.toLowerCase()}`; a.click();
     URL.revokeObjectURL(blobUrl);
   };
 

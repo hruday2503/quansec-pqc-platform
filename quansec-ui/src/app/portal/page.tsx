@@ -27,7 +27,7 @@ export default function PortalOverview() {
             Welcome back
           </div>
           <h1 className="text-3xl font-extrabold tracking-tight" style={{ color: "var(--text-primary)" }}>
-            Your QUANSEC Integration
+            Your Qryptid Integration
           </h1>
         </div>
         <div

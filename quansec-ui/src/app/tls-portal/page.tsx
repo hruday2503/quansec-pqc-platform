@@ -88,7 +88,7 @@ export default function TlsOverviewPage() {
             TLS 1.3 Transport
           </h1>
           <p className="text-sm mt-1" style={{ color: "var(--text-secondary)" }}>
-            Real handshakes against QUANSEC&apos;s NGINX data plane
+            Real handshakes against Qryptid&apos;s NGINX data plane
             {status && (
               <span className="font-mono-display"> · {status.service.host}:{status.service.port}</span>
             )}
@@ -336,7 +336,7 @@ export default function TlsOverviewPage() {
       )}
 
       <p className="text-[11px] leading-relaxed" style={{ color: "var(--text-tertiary)" }}>
-        This page reports the NGINX TLS data plane QUANSEC runs and probes, in the
+        This page reports the NGINX TLS data plane Qryptid runs and probes, in the
         same way the IPsec and SSH modules report StrongSwan and sshd. Traffic
         between your browser and this dashboard is separate and is not covered by
         these measurements.

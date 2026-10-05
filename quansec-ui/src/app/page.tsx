@@ -23,7 +23,7 @@ export default function LandingPage() {
             <ShieldHalf size={32} style={{ color: "var(--lattice-violet)" }} strokeWidth={1.8} />
           </div>
           <h1 className="text-4xl font-extrabold tracking-tight mb-3" style={{ color: "var(--text-primary)" }}>
-            QUANSEC
+            QRYPTID
           </h1>
           <p className="text-base max-w-xl mx-auto leading-relaxed" style={{ color: "var(--text-secondary)" }}>
             Post-quantum cryptography management. Choose a protocol module to
