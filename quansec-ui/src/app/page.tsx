@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { ShieldHalf, Network, Terminal, Globe, ArrowRight } from "lucide-react";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export default function LandingPage() {
   return (
@@ -11,6 +12,10 @@ export default function LandingPage() {
       <div className="absolute -top-40 left-1/4 w-[600px] h-[600px] rounded-full blur-3xl pointer-events-none" style={{ background: "var(--pqc-cyan-glow)", opacity: 0.4 }} />
       <div className="absolute -bottom-40 right-1/4 w-[500px] h-[500px] rounded-full blur-3xl pointer-events-none" style={{ background: "var(--lattice-violet-glow)", opacity: 0.35 }} />
 
+      <div className="absolute top-4 right-4 z-20" data-theme-toggle="">
+        <ThemeToggle />
+      </div>
+
       <div className="relative z-10 max-w-5xl mx-auto px-6 py-16">
         {/* Header */}
         <div className="text-center mb-16">
@@ -18,7 +23,7 @@ export default function LandingPage() {
             <ShieldHalf size={32} style={{ color: "var(--lattice-violet)" }} strokeWidth={1.8} />
           </div>
           <h1 className="text-4xl font-extrabold tracking-tight mb-3" style={{ color: "var(--text-primary)" }}>
-            QUANSEC
+            QRYPTID
           </h1>
           <p className="text-base max-w-xl mx-auto leading-relaxed" style={{ color: "var(--text-secondary)" }}>
             Post-quantum cryptography management. Choose a protocol module to
@@ -32,7 +37,7 @@ export default function LandingPage() {
           <Link href="/ipsec/login" className="group focus-ring rounded-2xl">
             <div
               className="relative rounded-2xl border p-7 h-full transition-all group-hover:scale-[1.02] overflow-hidden"
-              style={{ background: "var(--bg-panel)", borderColor: "var(--pqc-cyan-dim)" }}
+              style={{ background: "var(--bg-panel)", borderColor: "var(--pqc-cyan-edge)" }}
             >
               <div className="absolute -top-10 -right-10 w-32 h-32 rounded-full blur-2xl" style={{ background: "var(--pqc-cyan-glow)" }} />
               <div className="relative">
@@ -57,7 +62,7 @@ export default function LandingPage() {
           <Link href="/ssh/login" className="group focus-ring rounded-2xl">
             <div
               className="relative rounded-2xl border p-7 h-full transition-all group-hover:scale-[1.02] overflow-hidden"
-              style={{ background: "var(--bg-panel)", borderColor: "var(--lattice-violet-dim)" }}
+              style={{ background: "var(--bg-panel)", borderColor: "var(--lattice-violet-edge)" }}
             >
               <div className="absolute -top-10 -right-10 w-32 h-32 rounded-full blur-2xl" style={{ background: "var(--lattice-violet-glow)" }} />
               <div className="relative">
@@ -87,7 +92,7 @@ export default function LandingPage() {
           <Link href="/tls/login" className="group focus-ring rounded-2xl">
             <div
               className="relative rounded-2xl border p-7 h-full transition-all group-hover:scale-[1.02] overflow-hidden"
-              style={{ background: "var(--bg-panel)", borderColor: "var(--pqc-cyan-dim)" }}
+              style={{ background: "var(--bg-panel)", borderColor: "var(--pqc-cyan-edge)" }}
             >
               <div className="absolute -top-10 -right-10 w-32 h-32 rounded-full blur-2xl" style={{ background: "var(--pqc-cyan-glow)" }} />
               <div className="relative">

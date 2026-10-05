@@ -62,7 +62,7 @@ export default function SshKeysPage() {
         actions={
           <button onClick={() => setShowForm(true)}
             className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-bold focus-ring shrink-0"
-            style={{ background: "var(--lattice-violet)", color: "#1a0f3d" }}>
+            style={{ background: "var(--lattice-violet)", color: "var(--on-violet)" }}>
             <Plus size={15} /> Generate new key
           </button>
         }
@@ -98,9 +98,9 @@ export default function SshKeysPage() {
           <div className="flex gap-3">
             <input autoFocus value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && create()}
               placeholder="e.g. Monitoring server" className="flex-1 px-3.5 py-2.5 rounded-lg text-sm outline-none focus-ring"
-              style={{ background: "var(--bg-panel-raised)", border: "1px solid var(--border-hairline-bright)", color: "var(--text-primary)" }} />
+              style={{ background: "var(--input-bg)", border: "1px solid var(--border-hairline-bright)", color: "var(--text-primary)" }} />
             <button onClick={create} disabled={creating || !name.trim()} className="px-4 py-2.5 rounded-lg text-sm font-bold disabled:opacity-50 focus-ring"
-              style={{ background: "var(--lattice-violet)", color: "#1a0f3d" }}>{creating ? "Creating…" : "Create"}</button>
+              style={{ background: "var(--lattice-violet)", color: "var(--on-violet)" }}>{creating ? "Creating…" : "Create"}</button>
             <button onClick={() => setShowForm(false)} className="px-4 py-2.5 rounded-lg text-sm focus-ring"
               style={{ background: "var(--bg-panel-raised)", color: "var(--text-secondary)", border: "1px solid var(--border-hairline-bright)" }}>Cancel</button>
           </div>

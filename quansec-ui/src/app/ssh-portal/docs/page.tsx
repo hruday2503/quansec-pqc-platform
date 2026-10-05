@@ -17,7 +17,7 @@ curl https://api.quansec.io/api/ssh/connections \\
   },
   connect: {
     label: "Connect (PQC SSH)",
-    code: `# Connect to a QUANSEC-protected host using hybrid ML-KEM-768
+    code: `# Connect to a Qryptid-protected host using hybrid ML-KEM-768
 ssh -p 2222 user@your-host
 
 # Force the PQC hybrid KEX explicitly

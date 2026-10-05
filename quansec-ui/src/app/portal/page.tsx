@@ -23,11 +23,11 @@ export default function PortalOverview() {
     <div className="p-8 max-w-5xl mx-auto">
       <div className="mb-8 flex items-center justify-between">
         <div>
-          <div className="text-[11px] font-mono-display font-semibold tracking-[0.18em] uppercase mb-1.5" style={{ color: "var(--pqc-cyan-dim)" }}>
+          <div className="text-[11px] font-mono-display font-semibold tracking-[0.18em] uppercase mb-1.5" style={{ color: "var(--accent-label)" }}>
             Welcome back
           </div>
           <h1 className="text-3xl font-extrabold tracking-tight" style={{ color: "var(--text-primary)" }}>
-            Your QUANSEC Integration
+            Your Qryptid Integration
           </h1>
         </div>
         <div
@@ -54,7 +54,7 @@ export default function PortalOverview() {
             <p className="text-sm mb-6 max-w-lg leading-relaxed" style={{ color: "var(--text-secondary)" }}>
               Generate an API key to start securing your traffic with ML-KEM-1024 post-quantum encryption. Takes about two minutes.
             </p>
-            <Link href="/portal/keys" className="inline-flex items-center gap-2 px-5 py-3 rounded-lg text-sm font-bold focus-ring" style={{ background: "var(--pqc-cyan)", color: "#04201c" }}>
+            <Link href="/portal/keys" className="inline-flex items-center gap-2 px-5 py-3 rounded-lg text-sm font-bold focus-ring" style={{ background: "var(--pqc-cyan)", color: "var(--on-accent)" }}>
               Generate API key <ArrowRight size={16} strokeWidth={2.5} />
             </Link>
           </div>

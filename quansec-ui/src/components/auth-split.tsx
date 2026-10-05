@@ -3,6 +3,7 @@
 import { ReactNode } from "react";
 import Link from "next/link";
 import { ArrowLeft, ArrowRight, LucideIcon } from "lucide-react";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export interface AuthStat {
   value: string;
@@ -39,7 +40,13 @@ export function AuthSplitLayout({
   children: ReactNode;
 }) {
   return (
-    <div className="min-h-screen flex" style={{ background: "var(--bg-void)" }}>
+    <div
+      className="min-h-screen flex relative"
+      style={{ background: "var(--bg-void)", ["--module-accent" as string]: accent, ["--module-accent-soft" as string]: accentGlow }}
+    >
+      <div className="absolute top-4 right-4 z-20" data-theme-toggle="">
+        <ThemeToggle />
+      </div>
       <div className="hidden lg:flex w-1/2 relative overflow-hidden items-center justify-center">
         <div className="absolute inset-0 lattice-bg-active" style={{ opacity: 0.4 }} />
         <div className="absolute -top-32 -left-32 w-[500px] h-[500px] rounded-full blur-3xl pointer-events-none" style={{ background: accentGlow, opacity: 0.7 }} />
@@ -109,7 +116,7 @@ export function AuthField({
         required
         autoComplete={type === "email" ? "email" : "current-password"}
         className="w-full px-3.5 py-3 rounded-lg text-sm outline-none transition-colors focus-ring font-medium"
-        style={{ background: "var(--bg-panel-raised)", border: "1px solid var(--border-hairline-bright)", color: "var(--text-primary)" }}
+        style={{ background: "var(--input-bg)", border: "1px solid var(--border-hairline-bright)", color: "var(--text-primary)" }}
         placeholder={placeholder}
       />
     </div>

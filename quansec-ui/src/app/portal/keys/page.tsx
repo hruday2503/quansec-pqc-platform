@@ -77,7 +77,7 @@ export default function KeysPage() {
           <button
             onClick={() => setShowCreateForm(true)}
             className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition-opacity focus-ring shrink-0"
-            style={{ background: "var(--pqc-cyan)", color: "#04201c" }}
+            style={{ background: "var(--pqc-cyan)", color: "var(--on-accent)" }}
           >
             <Plus size={15} />
             Generate new key
@@ -133,13 +133,13 @@ export default function KeysPage() {
               onKeyDown={(e) => e.key === "Enter" && handleCreate()}
               placeholder="e.g. Production server, CI pipeline"
               className="flex-1 px-3.5 py-2.5 rounded-lg text-sm outline-none focus-ring"
-              style={{ background: "var(--bg-panel-raised)", border: "1px solid var(--border-hairline)", color: "var(--text-primary)" }}
+              style={{ background: "var(--input-bg)", border: "1px solid var(--border-hairline)", color: "var(--text-primary)" }}
             />
             <button
               onClick={handleCreate}
               disabled={creating || !newKeyName.trim()}
               className="px-4 py-2.5 rounded-lg text-sm font-semibold disabled:opacity-50 focus-ring"
-              style={{ background: "var(--pqc-cyan)", color: "#04201c" }}
+              style={{ background: "var(--pqc-cyan)", color: "var(--on-accent)" }}
             >
               {creating ? "Creating…" : "Create"}
             </button>

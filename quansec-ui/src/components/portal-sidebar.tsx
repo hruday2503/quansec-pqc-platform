@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LogOut, Menu, ShieldHalf, X, LucideIcon } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export interface PortalNavItem {
   href: string;
@@ -23,6 +24,8 @@ function NavLinks({
   accent: string;
   onNavigate?: () => void;
 }) {
+  // SSH is the violet module; its selected item takes the violet tint in light mode.
+  const violet = accent === "var(--lattice-violet)";
   return (
     <>
       {navItems.map((item) => {
@@ -36,7 +39,8 @@ function NavLinks({
             onClick={onNavigate}
             className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all focus-ring"
             style={{
-              background: active ? "var(--bg-panel-hover)" : "transparent",
+              background: active ? (violet ? "var(--nav-selected-violet)" : "var(--nav-selected)") : "transparent",
+              boxShadow: active ? `inset 0 0 0 1px ${violet ? "var(--nav-selected-ring-violet)" : "var(--nav-selected-ring)"}` : undefined,
               color: active ? accent : "var(--text-secondary)",
               fontWeight: active ? 600 : 500,
             }}
@@ -58,7 +62,7 @@ function Brand({ moduleLabel, accent, accentGlow, accentDim }: { moduleLabel: st
         <ShieldHalf size={18} style={{ color: accent }} strokeWidth={2} />
       </div>
       <div>
-        <div className="text-sm font-extrabold tracking-tight" style={{ color: "var(--text-primary)" }}>QUANSEC</div>
+        <div className="text-sm font-extrabold tracking-tight" style={{ color: "var(--text-primary)" }}>QRYPTID</div>
         <div className="text-[10px] font-mono-display font-semibold tracking-wider" style={{ color: "var(--text-tertiary)" }}>{moduleLabel}</div>
       </div>
     </div>
@@ -75,14 +79,17 @@ function AccountFooter({ accent, logout }: { accent: string; logout: () => void 
           {user?.role}
         </div>
       </div>
-      <button
-        onClick={logout}
-        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors focus-ring"
-        style={{ color: "var(--text-tertiary)" }}
-      >
-        <LogOut size={14} />
-        Sign out
-      </button>
+      <div className="flex items-center gap-1">
+        <button
+          onClick={logout}
+          className="flex-1 min-w-0 flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors focus-ring"
+          style={{ color: "var(--text-tertiary)" }}
+        >
+          <LogOut size={14} />
+          Sign out
+        </button>
+        <ThemeToggle />
+      </div>
     </div>
   );
 }
@@ -164,7 +171,7 @@ export function PortalSidebar({
             <ShieldHalf size={16} style={{ color: accent }} strokeWidth={2} />
           </div>
           <div>
-            <div className="text-xs font-extrabold tracking-tight" style={{ color: "var(--text-primary)" }}>QUANSEC</div>
+            <div className="text-xs font-extrabold tracking-tight" style={{ color: "var(--text-primary)" }}>QRYPTID</div>
             <div className="text-[9px] font-mono-display font-semibold tracking-wider" style={{ color: "var(--text-tertiary)" }}>{moduleLabel}</div>
           </div>
         </div>
@@ -184,13 +191,13 @@ export function PortalSidebar({
         <div className="lg:hidden fixed inset-0 z-40 flex">
           <div
             className="absolute inset-0"
-            style={{ background: "rgba(0,0,0,0.6)" }}
+            style={{ background: "var(--scrim-nav)" }}
             onClick={() => setDrawerOpen(false)}
             aria-hidden="true"
           />
           <aside
             className="relative z-50 w-72 max-w-[85vw] h-full flex flex-col"
-            style={{ background: "var(--bg-panel)", borderRight: "1px solid var(--border-hairline-bright)" }}
+            style={{ background: "var(--bg-panel)", borderRight: "1px solid var(--border-hairline-bright)", boxShadow: "var(--overlay-shadow)" }}
             role="dialog"
             aria-modal="true"
             aria-label={`${moduleLabel} navigation`}

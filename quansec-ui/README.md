@@ -1,6 +1,6 @@
-# QUANSEC UI
+# Qryptid UI
 
-Operator portals for the QUANSEC post-quantum cryptography platform.
+Operator portals for the Qryptid post-quantum cryptography platform.
 
 Next.js 16 (App Router) · React 19 · TypeScript · Tailwind CSS 4 · Recharts
 

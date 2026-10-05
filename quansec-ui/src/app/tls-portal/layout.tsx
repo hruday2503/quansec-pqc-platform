@@ -40,7 +40,7 @@ export default function TlsPortalLayout({ children }: { children: React.ReactNod
         note={
           <>
             <Globe size={11} className="inline mr-1" />
-            This portal observes QUANSEC&apos;s own TLS service. Browser traffic to
+            This portal observes Qryptid&apos;s own TLS service. Browser traffic to
             this dashboard is not part of that measurement.
           </>
         }

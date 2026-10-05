@@ -15,7 +15,7 @@ export default function TunnelsPage() {
 
   return (
     <div className="p-8 max-w-7xl mx-auto">
-      <PageHeader eyebrow="Network" title="IPsec tunnels" accent="var(--pqc-cyan-dim)" />
+      <PageHeader eyebrow="Network" title="IPsec tunnels" accent="var(--accent-label)" />
 
       <div className="space-y-4">
         {tunnels.length === 0 && (

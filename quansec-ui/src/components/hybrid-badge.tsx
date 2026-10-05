@@ -30,7 +30,7 @@ const STATE = {
     text: "CLASSICAL",
     color: "var(--danger-red)",
     glow: "var(--danger-glow)",
-    border: "#7a1f33",
+    border: "var(--danger-border)",
     Icon: ShieldAlert,
   },
   configured_unproven: {
@@ -58,7 +58,7 @@ const STATE = {
     text: "DEGRADED",
     color: "var(--danger-red)",
     glow: "var(--danger-glow)",
-    border: "#7a1f33",
+    border: "var(--danger-border)",
     Icon: ShieldAlert,
   },
 } as const;

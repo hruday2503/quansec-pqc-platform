@@ -68,7 +68,7 @@ export default function IntegrationsPage() {
     const blob = new Blob([sample[fmt] ?? ""], { type: "text/plain" });
     const blobUrl = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = blobUrl; a.download = `quansec-siem-events.${fmt.toLowerCase()}`; a.click();
+    a.href = blobUrl; a.download = `qryptid-siem-events.${fmt.toLowerCase()}`; a.click();
     URL.revokeObjectURL(blobUrl);
   };
 
@@ -94,7 +94,7 @@ export default function IntegrationsPage() {
               <div className="flex items-center gap-2 mb-2">
                 <ShieldCheck size={18} style={{ color: "var(--pqc-cyan)" }} />
                 <span className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>Fail-Closed</span>
-                {isClosed && <span className="ml-auto text-[10px] font-mono-display font-bold px-1.5 py-0.5 rounded" style={{ background: "var(--pqc-cyan)", color: "#04201c" }}>ACTIVE</span>}
+                {isClosed && <span className="ml-auto text-[10px] font-mono-display font-bold px-1.5 py-0.5 rounded" style={{ background: "var(--pqc-cyan)", color: "var(--on-accent)" }}>ACTIVE</span>}
               </div>
               <p className="text-xs leading-relaxed" style={{ color: "var(--text-primary)" }}>
                 If PQC can&apos;t be negotiated, refuse the connection. No classical downgrade. Maximum security.
@@ -107,7 +107,7 @@ export default function IntegrationsPage() {
               <div className="flex items-center gap-2 mb-2">
                 <ShieldAlert size={18} style={{ color: "var(--threat-amber)" }} />
                 <span className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>Fail-Open</span>
-                {!isClosed && <span className="ml-auto text-[10px] font-mono-display font-bold px-1.5 py-0.5 rounded" style={{ background: "var(--threat-amber)", color: "#2a1a04" }}>ACTIVE</span>}
+                {!isClosed && <span className="ml-auto text-[10px] font-mono-display font-bold px-1.5 py-0.5 rounded" style={{ background: "var(--threat-amber)", color: "var(--on-amber)" }}>ACTIVE</span>}
               </div>
               <p className="text-xs leading-relaxed" style={{ color: "var(--text-primary)" }}>
                 If PQC can&apos;t be negotiated, allow classical fallback. Preserves uptime. Lower security.

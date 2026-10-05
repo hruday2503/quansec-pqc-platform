@@ -88,7 +88,7 @@ export default function TlsOverviewPage() {
             TLS 1.3 Transport
           </h1>
           <p className="text-sm mt-1" style={{ color: "var(--text-secondary)" }}>
-            Real handshakes against QUANSEC&apos;s NGINX data plane
+            Real handshakes against Qryptid&apos;s NGINX data plane
             {status && (
               <span className="font-mono-display"> · {status.service.host}:{status.service.port}</span>
             )}
@@ -98,7 +98,7 @@ export default function TlsOverviewPage() {
           <HybridBadge status={status} />
           <button onClick={runProbes} disabled={probing}
             className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold focus-ring disabled:opacity-50"
-            style={{ background: "var(--pqc-cyan)", color: "#04231f" }}>
+            style={{ background: "var(--pqc-cyan)", color: "var(--on-accent-tls)" }}>
             {probing ? <RefreshCw size={13} className="animate-spin" /> : <PlugZap size={13} strokeWidth={2.5} />}
             {probing ? "Probing…" : "Run probe suite"}
           </button>
@@ -107,7 +107,7 @@ export default function TlsOverviewPage() {
 
       {loadError && (
         <div className="px-4 py-3 rounded-lg text-xs font-mono-display flex items-center gap-2"
-             style={{ background: "var(--danger-glow)", color: "var(--danger-red)", border: "1px solid #7a1f33" }}>
+             style={{ background: "var(--danger-glow)", color: "var(--danger-red)", border: "1px solid var(--danger-border)" }}>
           <XCircle size={14} /> {loadError}
         </div>
       )}
@@ -138,7 +138,7 @@ export default function TlsOverviewPage() {
         <Panel>
           <div className="p-5">
             <div className="text-[10px] tracking-[0.18em] uppercase font-mono-display font-semibold mb-2"
-                 style={{ color: "var(--pqc-cyan-dim)" }}>Data plane</div>
+                 style={{ color: "var(--accent-label)" }}>Data plane</div>
             <div className="flex items-center gap-2">
               {listening
                 ? <CheckCircle2 size={20} style={{ color: "var(--pqc-cyan)" }} />
@@ -164,7 +164,7 @@ export default function TlsOverviewPage() {
         <Panel>
           <div className="p-5">
             <div className="text-[10px] tracking-[0.18em] uppercase font-mono-display font-semibold mb-2"
-                 style={{ color: "var(--pqc-cyan-dim)" }}>Sessions</div>
+                 style={{ color: "var(--accent-label)" }}>Sessions</div>
             <MetricValue value={stats?.total_sessions ?? 0} />
             <div className="text-xs font-mono-display mt-1" style={{ color: "var(--text-tertiary)" }}>
               {stats?.active_sessions ?? 0} active
@@ -176,7 +176,7 @@ export default function TlsOverviewPage() {
         <Panel>
           <div className="p-5">
             <div className="text-[10px] tracking-[0.18em] uppercase font-mono-display font-semibold mb-2"
-                 style={{ color: "var(--pqc-cyan-dim)" }}>Hybrid coverage</div>
+                 style={{ color: "var(--accent-label)" }}>Hybrid coverage</div>
             <MetricValue
               value={stats?.has_evidence ? stats.hybrid_coverage : "—"}
               unit={stats?.has_evidence ? "%" : undefined}
@@ -195,7 +195,7 @@ export default function TlsOverviewPage() {
         <Panel>
           <div className="p-5">
             <div className="text-[10px] tracking-[0.18em] uppercase font-mono-display font-semibold mb-2"
-                 style={{ color: "var(--pqc-cyan-dim)" }}>TLS 1.3 coverage</div>
+                 style={{ color: "var(--accent-label)" }}>TLS 1.3 coverage</div>
             <MetricValue
               value={stats?.has_evidence ? stats.tls13_coverage : "—"}
               unit={stats?.has_evidence ? "%" : undefined}
@@ -336,7 +336,7 @@ export default function TlsOverviewPage() {
       )}
 
       <p className="text-[11px] leading-relaxed" style={{ color: "var(--text-tertiary)" }}>
-        This page reports the NGINX TLS data plane QUANSEC runs and probes, in the
+        This page reports the NGINX TLS data plane Qryptid runs and probes, in the
         same way the IPsec and SSH modules report StrongSwan and sshd. Traffic
         between your browser and this dashboard is separate and is not covered by
         these measurements.

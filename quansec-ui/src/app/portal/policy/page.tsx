@@ -88,7 +88,7 @@ export default function PolicyPage() {
               className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold transition-opacity disabled:opacity-50 focus-ring"
               style={{
                 background: p.pqc ? "var(--pqc-cyan)" : "var(--bg-panel-raised)",
-                color: p.pqc ? "#04201c" : "var(--text-primary)",
+                color: p.pqc ? "var(--on-accent)" : "var(--text-primary)",
                 border: p.pqc ? "none" : "1px solid var(--border-hairline-bright)",
               }}
             >
