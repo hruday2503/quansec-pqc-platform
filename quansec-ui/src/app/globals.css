@@ -60,6 +60,105 @@
   --status-neutral: var(--text-tertiary);
   --status-neutral-dim: var(--border-hairline-bright);
   --status-neutral-glow: var(--bg-panel-raised);
+
+  /*
+   * Role tokens. Each one names a job a single palette variable was doing
+   * alongside another, so light mode can give the two jobs different values.
+   * In dark every value below is exactly the literal it replaced.
+   */
+  --accent-label: var(--pqc-cyan-dim);            /* eyebrow and table-header text */
+  --pqc-cyan-edge: var(--pqc-cyan-dim);           /* portal-card accent border */
+  --lattice-violet-edge: var(--lattice-violet-dim);
+  --on-accent: #04201c;                           /* text on a solid cyan fill */
+  --on-accent-tls: #04231f;                       /* TLS pages used this slightly different value */
+  --on-violet: #1a0f3d;                           /* text on a solid violet fill */
+  --on-amber: #2a1a04;                            /* text on a solid amber fill */
+  --on-danger: #fff;                              /* text on a solid red fill */
+  --danger-border: #7a1f33;
+  --input-bg: var(--bg-panel-raised);
+  --scrim: rgba(0, 0, 0, 0.72);
+  --scrim-nav: rgba(0, 0, 0, 0.6);
+  --panel-inset: 0 1px 0 0 rgba(255, 255, 255, 0.03) inset;
+  --overlay-shadow: none;
+  --nav-selected: var(--bg-panel-hover);
+  --nav-selected-violet: var(--bg-panel-hover);
+  --nav-selected-ring: transparent;
+  --nav-selected-ring-violet: transparent;
+  --grid-line: var(--border-hairline-bright);
+  --grid-line-active: var(--pqc-cyan-dim);
+  --gradient-text-a: #3ee8c4;
+  --gradient-text-b: #7fffd4;
+  --text-glow: var(--pqc-cyan-glow);
+  --scrollbar-thumb: var(--border-hairline-bright);
+  --module-accent: var(--pqc-cyan);
+  --module-accent-soft: var(--pqc-cyan-glow);
+
+  color-scheme: dark;
+}
+
+/*
+ * Light theme. Only colours change; every size, space and layout is shared
+ * with dark. Module accents keep their identity (IPsec and TLS teal, SSH
+ * violet) at steps that meet AA on white.
+ */
+[data-theme="light"] {
+  color-scheme: light;
+
+  --bg-void: #F6F8FA;
+  --bg-panel: #FFFFFF;
+  --bg-panel-raised: #F1F5F9;
+  --bg-panel-hover: #F1F5F9;
+  --border-hairline: #E5EAF0;
+  --border-hairline-bright: #E1E7EE;
+
+  --pqc-cyan: #0B7A6E;
+  --pqc-cyan-dim: #BFE9E1;
+  --pqc-cyan-glow: #E8F8F5;
+
+  --threat-amber: #B45309;
+  --threat-amber-dim: #F5D9A8;
+  --threat-amber-glow: #FFF7E6;
+
+  --lattice-violet: #5A49CF;
+  --lattice-violet-dim: #D9D3FA;
+  --lattice-violet-glow: #F0EEFF;
+
+  --danger-red: #C62828;
+  --danger-glow: #FEF2F2;
+
+  --text-primary: #0F172A;
+  --text-secondary: #475569;
+  /* #64748B measured 4.34:1 on #F1F5F9 fills; one step darker passes AA on every light surface. */
+  --text-tertiary: #5F6E84;
+
+  --status-critical-dim: #F5C2C2;
+
+  --accent-label: #0B6B60;
+  --pqc-cyan-edge: #86CCC2;
+  --lattice-violet-edge: #B6ACF3;
+  --on-accent: #FFFFFF;
+  --on-accent-tls: #FFFFFF;
+  --on-violet: #FFFFFF;
+  --on-amber: #FFFFFF;
+  --on-danger: #FFFFFF;
+  --danger-border: #F5C2C2;
+  --input-bg: #FFFFFF;
+  --scrim: rgba(15, 23, 42, 0.40);
+  --scrim-nav: rgba(15, 23, 42, 0.32);
+  --panel-inset: 0 0 0 0 transparent;
+  --overlay-shadow: 0 16px 40px rgba(15, 23, 42, 0.14), 0 2px 8px rgba(15, 23, 42, 0.06);
+  --nav-selected: #F1FBF9;
+  --nav-selected-violet: #F7F5FF;
+  --nav-selected-ring: #BFE9E1;
+  --nav-selected-ring-violet: #D9D3FA;
+  /* Lattice layers sit at 0.4–0.55 opacity, so these land near 0.045 on screen. */
+  --grid-line: rgba(15, 23, 42, 0.11);
+  --grid-line-active: rgba(14, 147, 132, 0.22);
+  --gradient-text-a: #0B7A6E;
+  --gradient-text-b: #0B7A6E;
+  --text-glow: transparent;
+  --scrollbar-thumb: #CBD5E1;
+  --input-border: #D3DBE4;
 }
 
 * {
@@ -71,6 +170,8 @@ html, body {
   color: var(--text-primary);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+  /* Theme switches fade the page background only; components switch instantly. */
+  transition: background-color 180ms ease, color 180ms ease;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -83,7 +184,7 @@ html, body {
 
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--border-hairline-bright); border-radius: 4px; }
+::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--text-tertiary); }
 
 .font-mono-display { font-family: var(--font-mono); }
@@ -100,16 +201,16 @@ html, body {
 
 .lattice-bg {
   background-image:
-    linear-gradient(var(--border-hairline-bright) 1px, transparent 1px),
-    linear-gradient(90deg, var(--border-hairline-bright) 1px, transparent 1px);
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
   background-size: 28px 28px;
   animation: lattice-drift 60s linear infinite;
 }
 
 .lattice-bg-active {
   background-image:
-    linear-gradient(var(--pqc-cyan-dim) 1px, transparent 1px),
-    linear-gradient(90deg, var(--pqc-cyan-dim) 1px, transparent 1px);
+    linear-gradient(var(--grid-line-active) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line-active) 1px, transparent 1px);
   background-size: 28px 28px;
   animation: lattice-drift 40s linear infinite, lattice-pulse 4s ease-in-out infinite;
   opacity: 0.55;
@@ -127,11 +228,11 @@ html, body {
 }
 
 .text-glow-cyan {
-  text-shadow: 0 0 24px var(--pqc-cyan-glow);
+  text-shadow: 0 0 24px var(--text-glow);
 }
 
 .gradient-cyan-text {
-  background: linear-gradient(135deg, #3ee8c4 0%, #7fffd4 50%, #3ee8c4 100%);
+  background: linear-gradient(135deg, var(--gradient-text-a) 0%, var(--gradient-text-b) 50%, var(--gradient-text-a) 100%);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -152,4 +253,58 @@ html, body {
   mask-composite: exclude;
   pointer-events: none;
   opacity: 0.6;
+}
+
+/*
+ * Browser autofill paints its own yellow/blue box over inputs. Repaint it
+ * with the input's own surface so autofilled fields match in both themes.
+ */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--text-primary);
+  caret-color: var(--text-primary);
+  -webkit-box-shadow: 0 0 0 1000px var(--input-bg) inset;
+  transition: background-color 9999s ease-out 0s;
+}
+
+/* Light form controls: white field, 1.5px accent edge and a soft ring on focus. */
+[data-theme="light"] :is(input, textarea, select):not([type="checkbox"]):not([type="radio"]) {
+  border-color: var(--input-border) !important;
+}
+[data-theme="light"] :is(input, textarea, select):not([type="checkbox"]):not([type="radio"]):focus-visible {
+  outline: none;
+  border-color: var(--module-accent) !important;
+  box-shadow: 0 0 0 0.5px var(--module-accent), 0 0 0 4px var(--module-accent-soft);
+}
+[data-theme="light"] input:-webkit-autofill:focus-visible {
+  -webkit-box-shadow: 0 0 0 1000px var(--input-bg) inset, 0 0 0 0.5px var(--module-accent), 0 0 0 4px var(--module-accent-soft);
+}
+[data-theme="light"] input[type="checkbox"] {
+  accent-color: var(--module-accent);
+}
+
+[data-theme="light"] ::selection {
+  background: var(--module-accent-soft);
+}
+
+/*
+ * List dividers. These lists set their hairline colour on the parent, which
+ * Tailwind's divide-y does not read, so the rows fell back to currentColor.
+ * Corrected for light mode here; dark mode is left exactly as shipped.
+ */
+[data-theme="light"] .divide-y > :not(:last-child) {
+  border-color: var(--border-hairline);
+}
+
+/*
+ * Next's built-in 404 carries its own body colours keyed to the OS scheme.
+ * In light mode it follows the app theme instead.
+ */
+[data-theme="light"] body {
+  background: var(--bg-void);
+  color: var(--text-primary);
+}
+[data-theme="light"] .next-error-h1 {
+  border-right-color: var(--input-border) !important;
 }
