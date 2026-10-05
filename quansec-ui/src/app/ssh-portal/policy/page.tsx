@@ -91,7 +91,7 @@ export default function SshPolicyPage() {
             <div className="text-[11px] font-mono-display mb-4" style={{ color: "var(--text-secondary)" }}>{p.kex}</div>
             <button onClick={() => apply(p.name)} disabled={applying !== null}
               className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-bold disabled:opacity-50 focus-ring"
-              style={{ background: p.pqc ? "var(--lattice-violet)" : "var(--bg-panel-raised)", color: p.pqc ? "#1a0f3d" : "var(--text-primary)", border: p.pqc ? "none" : "1px solid var(--border-hairline-bright)" }}>
+              style={{ background: p.pqc ? "var(--lattice-violet)" : "var(--bg-panel-raised)", color: p.pqc ? "var(--on-violet)" : "var(--text-primary)", border: p.pqc ? "none" : "1px solid var(--border-hairline-bright)" }}>
               {applying === p.name && <Loader2 size={14} className="animate-spin" />}
               {applying === p.name ? "Applying…" : "Apply Policy"}
             </button>

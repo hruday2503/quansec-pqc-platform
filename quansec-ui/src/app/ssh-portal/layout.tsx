@@ -34,7 +34,10 @@ export default function SshPortalLayout({ children }: { children: React.ReactNod
   if (!user) return null;
 
   return (
-    <div className="min-h-screen flex flex-col lg:flex-row" style={{ background: "var(--bg-void)" }}>
+    <div
+      className="min-h-screen flex flex-col lg:flex-row"
+      style={{ background: "var(--bg-void)", ["--module-accent" as string]: "var(--lattice-violet)", ["--module-accent-soft" as string]: "var(--lattice-violet-glow)" }}
+    >
       <PortalSidebar
         moduleLabel="SSH MODULE"
         accent="var(--lattice-violet)"

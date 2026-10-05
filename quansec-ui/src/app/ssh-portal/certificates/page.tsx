@@ -104,7 +104,7 @@ export default function CertificatesPage() {
             <textarea id="cert-public-key" value={publicKey} onChange={(e) => setPublicKey(e.target.value)} rows={3}
               placeholder="ssh-ed25519 AAAAC3Nza... user@device"
               className="w-full px-3.5 py-2.5 rounded-lg text-xs font-mono-display outline-none focus-ring resize-none"
-              style={{ background: "var(--bg-panel-raised)", border: "1px solid var(--border-hairline-bright)", color: "var(--text-primary)" }} />
+              style={{ background: "var(--input-bg)", border: "1px solid var(--border-hairline-bright)", color: "var(--text-primary)" }} />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -112,29 +112,29 @@ export default function CertificatesPage() {
               <label htmlFor="cert-identity" className="block text-xs font-mono-display font-bold uppercase tracking-wide mb-2" style={{ color: "var(--text-primary)" }}>Identity</label>
               <input id="cert-identity" value={identity} onChange={(e) => setIdentity(e.target.value)} placeholder="alice@bank.com"
                 className="w-full px-3.5 py-2.5 rounded-lg text-sm outline-none focus-ring"
-                style={{ background: "var(--bg-panel-raised)", border: "1px solid var(--border-hairline-bright)", color: "var(--text-primary)" }} />
+                style={{ background: "var(--input-bg)", border: "1px solid var(--border-hairline-bright)", color: "var(--text-primary)" }} />
             </div>
             <div>
               <label htmlFor="cert-principals" className="block text-xs font-mono-display font-bold uppercase tracking-wide mb-2" style={{ color: "var(--text-primary)" }}>Principals</label>
               <input id="cert-principals" value={principals} onChange={(e) => setPrincipals(e.target.value)} placeholder="hd6441"
                 className="w-full px-3.5 py-2.5 rounded-lg text-sm outline-none focus-ring"
-                style={{ background: "var(--bg-panel-raised)", border: "1px solid var(--border-hairline-bright)", color: "var(--text-primary)" }} />
+                style={{ background: "var(--input-bg)", border: "1px solid var(--border-hairline-bright)", color: "var(--text-primary)" }} />
             </div>
             <div>
               <label htmlFor="cert-hours" className="block text-xs font-mono-display font-bold uppercase tracking-wide mb-2" style={{ color: "var(--text-primary)" }}>Valid (hours)</label>
               <input id="cert-hours" type="number" value={hours} min={1} max={168} onChange={(e) => setHours(parseInt(e.target.value) || 8)}
                 className="w-full px-3.5 py-2.5 rounded-lg text-sm outline-none focus-ring"
-                style={{ background: "var(--bg-panel-raised)", border: "1px solid var(--border-hairline-bright)", color: "var(--text-primary)" }} />
+                style={{ background: "var(--input-bg)", border: "1px solid var(--border-hairline-bright)", color: "var(--text-primary)" }} />
             </div>
           </div>
 
           {error && (
-            <div className="px-3.5 py-2.5 rounded-lg text-xs font-mono-display" style={{ background: "var(--danger-glow)", color: "var(--danger-red)", border: "1px solid #7a1f33" }}>{error}</div>
+            <div className="px-3.5 py-2.5 rounded-lg text-xs font-mono-display" style={{ background: "var(--danger-glow)", color: "var(--danger-red)", border: "1px solid var(--danger-border)" }}>{error}</div>
           )}
 
           <button onClick={issue} disabled={issuing || !publicKey.trim() || !identity.trim()}
             className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-bold disabled:opacity-50 focus-ring"
-            style={{ background: "var(--lattice-violet)", color: "#1a0f3d" }}>
+            style={{ background: "var(--lattice-violet)", color: "var(--on-violet)" }}>
             <ShieldCheck size={15} /> {issuing ? "Signing…" : "Issue Certificate"}
           </button>
         </div>
@@ -154,7 +154,7 @@ export default function CertificatesPage() {
               {result.certificate}
             </div>
             <div className="flex gap-3">
-              <button onClick={download} className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold focus-ring" style={{ background: "var(--pqc-cyan)", color: "#04201c" }}>
+              <button onClick={download} className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold focus-ring" style={{ background: "var(--pqc-cyan)", color: "var(--on-accent)" }}>
                 <Download size={13} /> Download {result.filename}
               </button>
               <button onClick={() => { navigator.clipboard.writeText(result.certificate); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
