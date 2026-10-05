@@ -48,7 +48,7 @@ export default function TlsCertificatePage() {
 
       {error && (
         <div className="px-4 py-3 rounded-lg text-xs font-mono-display flex items-center gap-2"
-             style={{ background: "var(--danger-glow)", color: "var(--danger-red)", border: "1px solid #7a1f33" }}>
+             style={{ background: "var(--danger-glow)", color: "var(--danger-red)", border: "1px solid var(--danger-border)" }}>
           <XCircle size={14} /> {error}
         </div>
       )}

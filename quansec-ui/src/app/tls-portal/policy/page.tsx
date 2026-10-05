@@ -111,7 +111,7 @@ export default function TlsPolicyPage() {
 
       {error && (
         <div className="px-4 py-3 rounded-lg text-xs font-mono-display flex items-center gap-2"
-             style={{ background: "var(--danger-glow)", color: "var(--danger-red)", border: "1px solid #7a1f33" }}>
+             style={{ background: "var(--danger-glow)", color: "var(--danger-red)", border: "1px solid var(--danger-border)" }}>
           <XCircle size={14} /> {error}
         </div>
       )}
@@ -171,7 +171,7 @@ export default function TlsPolicyPage() {
                 <tr className="border-b" style={{ borderColor: "var(--border-hairline)" }}>
                   {["", "Intended", "Running"].map((h) => (
                     <th key={h} className="px-5 py-3 text-[10px] font-mono-display font-semibold uppercase tracking-wider"
-                        style={{ color: "var(--pqc-cyan-dim)" }}>{h}</th>
+                        style={{ color: "var(--accent-label)" }}>{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -209,7 +209,7 @@ export default function TlsPolicyPage() {
           right={
             <button onClick={runDowngradeTest} disabled={testing}
               className="px-3.5 py-2 rounded-lg text-xs font-bold focus-ring disabled:opacity-50"
-              style={{ background: "var(--pqc-cyan)", color: "#04231f" }}>
+              style={{ background: "var(--pqc-cyan)", color: "var(--on-accent-tls)" }}>
               {testing ? "Testing…" : "Run downgrade test"}
             </button>
           }
@@ -228,7 +228,7 @@ export default function TlsPolicyPage() {
             <div className="px-3.5 py-3 rounded-lg text-xs space-y-2"
                  style={{
                    background: test.rejected ? "var(--pqc-cyan-glow)" : "var(--danger-glow)",
-                   border: `1px solid ${test.rejected ? "var(--pqc-cyan-dim)" : "#7a1f33"}`,
+                   border: `1px solid ${test.rejected ? "var(--pqc-cyan-dim)" : "var(--danger-border)"}`,
                  }}>
               <div className="flex items-center gap-2 font-mono-display font-bold"
                    style={{ color: test.rejected ? "var(--pqc-cyan)" : "var(--danger-red)" }}>

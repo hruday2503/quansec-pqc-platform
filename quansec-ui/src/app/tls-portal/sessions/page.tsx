@@ -112,7 +112,7 @@ export default function TlsSessionsPage() {
         </div>
         <button onClick={load} disabled={loading}
           className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold focus-ring disabled:opacity-50"
-          style={{ background: "var(--pqc-cyan)", color: "#04231f" }}>
+          style={{ background: "var(--pqc-cyan)", color: "var(--on-accent-tls)" }}>
           <RefreshCw size={13} className={loading ? "animate-spin" : ""} strokeWidth={2.5} />
           Refresh
         </button>
@@ -120,7 +120,7 @@ export default function TlsSessionsPage() {
 
       {error && (
         <div className="px-4 py-3 rounded-lg text-xs font-mono-display flex items-center gap-2"
-             style={{ background: "var(--danger-glow)", color: "var(--danger-red)", border: "1px solid #7a1f33" }}>
+             style={{ background: "var(--danger-glow)", color: "var(--danger-red)", border: "1px solid var(--danger-border)" }}>
           <XCircle size={14} /> {error}
         </div>
       )}
@@ -210,7 +210,7 @@ export default function TlsSessionsPage() {
                     "Negotiated group", "Client cert", "Status", "Evidence"].map((h) => (
                     <th key={h}
                         className="px-4 py-3 text-[10px] font-mono-display font-semibold uppercase tracking-wider whitespace-nowrap"
-                        style={{ color: "var(--pqc-cyan-dim)" }}>{h}</th>
+                        style={{ color: "var(--accent-label)" }}>{h}</th>
                   ))}
                 </tr>
               </thead>
