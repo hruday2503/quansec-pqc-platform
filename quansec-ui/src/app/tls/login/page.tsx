@@ -50,7 +50,7 @@ export default function TlsLoginPage() {
           <AuthField label="Password" type="password" value={password} onChange={setPassword} placeholder="••••••••" />
         </div>
         {error && <AuthError message={error} />}
-        <AuthSubmit submitting={submitting} accent="var(--pqc-cyan)" onAccent="#04231f" />
+        <AuthSubmit submitting={submitting} accent="var(--pqc-cyan)" onAccent="var(--on-accent-tls)" />
       </form>
     </AuthSplitLayout>
   );

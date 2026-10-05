@@ -50,7 +50,7 @@ export default function SshLoginPage() {
           <AuthField label="Password" type="password" value={password} onChange={setPassword} placeholder="••••••••" />
         </div>
         {error && <AuthError message={error} />}
-        <AuthSubmit submitting={submitting} accent="var(--lattice-violet)" onAccent="#1a0f3d" />
+        <AuthSubmit submitting={submitting} accent="var(--lattice-violet)" onAccent="var(--on-violet)" />
       </form>
     </AuthSplitLayout>
   );
