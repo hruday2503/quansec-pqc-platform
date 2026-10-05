@@ -27,7 +27,7 @@ export function Panel({
 }) {
   return (
     <div
-      className={`rounded-xl border shadow-[0_1px_0_0_rgba(255,255,255,0.03)_inset] ${className}`}
+      className={`rounded-xl border shadow-[var(--panel-inset)] ${className}`}
       style={{
         background: "var(--bg-panel)",
         borderColor: "var(--border-hairline-bright)",
@@ -56,7 +56,7 @@ export function PanelHeader({
         {eyebrow && (
           <div
             className="text-[10px] tracking-[0.18em] uppercase mb-1 font-mono-display font-semibold"
-            style={{ color: "var(--pqc-cyan-dim)" }}
+            style={{ color: "var(--accent-label)" }}
           >
             {eyebrow}
           </div>
@@ -178,7 +178,7 @@ export function PageHeader({
   title,
   description,
   actions,
-  accent = "var(--pqc-cyan-dim)",
+  accent = "var(--accent-label)",
 }: {
   eyebrow?: string;
   title: string;
@@ -388,7 +388,7 @@ export function ConfirmDialog({
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-6"
-      style={{ background: "rgba(0,0,0,0.72)" }}
+      style={{ background: "var(--scrim)" }}
       role="dialog"
       aria-modal="true"
       aria-labelledby={titleId}
@@ -396,7 +396,7 @@ export function ConfirmDialog({
     >
       <div
         className="w-full max-w-md rounded-2xl p-5 space-y-4"
-        style={{ background: "var(--bg-panel)", border: `1px solid ${borderColor}` }}
+        style={{ background: "var(--bg-panel)", border: `1px solid ${borderColor}`, boxShadow: "var(--overlay-shadow)" }}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-2">
@@ -409,7 +409,7 @@ export function ConfirmDialog({
             ref={confirmRef}
             onClick={onConfirm}
             className="px-3.5 py-2 rounded-lg text-xs font-bold focus-ring"
-            style={{ background: color, color: tone === "critical" ? "#fff" : "#04201c" }}
+            style={{ background: color, color: tone === "critical" ? "var(--on-danger)" : "var(--on-accent)" }}
           >
             {confirmLabel}
           </button>
