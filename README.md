@@ -1,6 +1,6 @@
 <div align="center">
 
-# QUANSEC
+# QRYPTID
 
 **Post-Quantum Cryptography Management Platform**
 
